@@ -13,7 +13,8 @@ const S = {
   audioCtx:     null,
   analyser:     null,
   animFrame:    null,
-  generatedURL: null,
+  generatedURL:  null,
+  generatedMime: 'audio/mpeg',
 };
 
 /* ── API ───────────────────────────────────────────────────────────────────── */
@@ -226,16 +227,13 @@ async function pollTTSStatus() {
   try {
     const s = await api.status();
     chip.classList.remove('hidden', 'loading', 'ready', 'error');
-    if (s.tts_ready) {
-      chip.textContent = 'TTS ready';
+    if (s.any_configured) {
+      const names = s.providers.join(', ');
+      chip.textContent = `APIs: ${names}`;
       chip.classList.add('ready');
-    } else if (s.tts_error) {
-      chip.textContent = 'TTS unavailable';
-      chip.classList.add('error');
     } else {
-      chip.textContent = 'Loading TTS model…';
-      chip.classList.add('loading');
-      setTimeout(pollTTSStatus, 8000);
+      chip.textContent = 'No API keys configured — see .env';
+      chip.classList.add('error');
     }
   } catch {
     chip.classList.add('hidden');
@@ -687,7 +685,8 @@ async function generateSpeech() {
   try {
     const blob = await api.synthesize(S.voice.id, text);
     if (S.generatedURL) URL.revokeObjectURL(S.generatedURL);
-    S.generatedURL = URL.createObjectURL(blob);
+    S.generatedMime = blob.type || 'audio/mpeg';
+    S.generatedURL  = URL.createObjectURL(blob);
 
     const player = document.getElementById('audio-player');
     player.src = S.generatedURL;
@@ -697,9 +696,10 @@ async function generateSpeech() {
     player.play().catch(() => {});
 
     document.getElementById('btn-download').onclick = () => {
-      const a = document.createElement('a');
-      a.href = S.generatedURL;
-      a.download = `${S.voice.name.replace(/\s+/g, '_')}_speech.wav`;
+      const ext = S.generatedMime.includes('mpeg') ? 'mp3' : 'wav';
+      const a   = document.createElement('a');
+      a.href     = S.generatedURL;
+      a.download = `${S.voice.name.replace(/\s+/g, '_')}_speech.${ext}`;
       a.click();
     };
   } catch (err) {

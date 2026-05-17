@@ -1,4 +1,7 @@
-"""Startup script — creates DB tables then launches the app."""
+"""Startup: create DB tables then launch the server."""
+from dotenv import load_dotenv
+load_dotenv()
+
 from app import app, db
 
 with app.app_context():
