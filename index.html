@@ -6,7 +6,7 @@
   <title>VoiceStudio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="static/css/style.css" />
 </head>
 <body>
 
@@ -18,12 +18,10 @@
       <span class="logo-text">VoiceStudio</span>
     </div>
     <p class="auth-sub">Clone and speak in any voice.</p>
-
     <div class="tab-row">
       <button class="tab active" data-tab="login">Sign in</button>
       <button class="tab" data-tab="register">Create account</button>
     </div>
-
     <form id="form-auth" autocomplete="off" novalidate>
       <div class="field">
         <label for="auth-username">Username</label>
@@ -36,6 +34,7 @@
       <div id="auth-error" class="error-msg hidden"></div>
       <button type="submit" id="auth-submit" class="btn-primary full">Sign in</button>
     </form>
+    <p class="auth-note">Everything is stored only in your browser.</p>
   </div>
 </div>
 
@@ -48,19 +47,116 @@
     </div>
     <div class="header-right">
       <span id="header-username" class="header-user"></span>
+      <button id="btn-settings" class="btn-icon" title="API Keys">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
       <button id="btn-logout" class="btn-ghost">Sign out</button>
     </div>
   </header>
-
   <main class="dashboard-main">
     <div class="section-header">
       <h1>Your Voices</h1>
-      <div id="tts-status" class="status-chip hidden"></div>
+      <div id="provider-badges" class="provider-badges"></div>
+    </div>
+    <div id="no-keys-banner" class="no-keys-banner hidden">
+      No API keys set up yet. <button id="btn-banner-settings" class="inline-link">Add keys →</button>
+    </div>
+    <div id="voice-grid" class="voice-grid"></div>
+  </main>
+</div>
+
+<!-- ── Settings ───────────────────────────────────────────────────────────────── -->
+<div id="view-settings" class="view">
+  <header class="app-header">
+    <button id="settings-back" class="btn-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <div class="header-title">
+      <span class="view-title">API Keys</span>
+      <span class="view-subtitle">Stored locally in your browser only</span>
+    </div>
+  </header>
+  <main class="settings-main">
+    <p class="settings-intro">Add keys for as many providers as you like. Synthesis rotates between them automatically so free tiers last much longer. All free tiers — no card needed to start.</p>
+
+    <div class="settings-section">
+      <div class="settings-provider-head">
+        <div>
+          <h3>ElevenLabs</h3>
+          <p class="settings-free">10,000 characters / month free</p>
+        </div>
+        <a href="https://elevenlabs.io" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
+      </div>
+      <div class="field">
+        <label>API Key <span class="key-path">Profile → API Keys</span></label>
+        <div class="key-row">
+          <input type="password" id="key-elevenlabs" placeholder="sk_…" autocomplete="off" />
+          <button class="btn-reveal" data-for="key-elevenlabs">Show</button>
+        </div>
+      </div>
     </div>
 
-    <div id="voice-grid" class="voice-grid">
-      <!-- populated by JS -->
+    <div class="settings-section">
+      <div class="settings-provider-head">
+        <div>
+          <h3>Play.ht</h3>
+          <p class="settings-free">12,500 words / month free</p>
+        </div>
+        <a href="https://play.ht" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
+      </div>
+      <div class="field">
+        <label>Secret Key <span class="key-path">Dashboard → API Access</span></label>
+        <div class="key-row">
+          <input type="password" id="key-playht-secret" placeholder="your secret key" autocomplete="off" />
+          <button class="btn-reveal" data-for="key-playht-secret">Show</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>User ID</label>
+        <input type="text" id="key-playht-user" placeholder="your user id" autocomplete="off" />
+      </div>
     </div>
+
+    <div class="settings-section">
+      <div class="settings-provider-head">
+        <div>
+          <h3>Cartesia</h3>
+          <p class="settings-free">$5 credit / month free</p>
+        </div>
+        <a href="https://cartesia.ai" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
+      </div>
+      <div class="field">
+        <label>API Key <span class="key-path">Dashboard → API Keys</span></label>
+        <div class="key-row">
+          <input type="password" id="key-cartesia" placeholder="your api key" autocomplete="off" />
+          <button class="btn-reveal" data-for="key-cartesia">Show</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-provider-head">
+        <div>
+          <h3>LMNT</h3>
+          <p class="settings-free">500 utterances / month free</p>
+        </div>
+        <a href="https://lmnt.com" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
+      </div>
+      <div class="field">
+        <label>API Key <span class="key-path">Dashboard → API Key</span></label>
+        <div class="key-row">
+          <input type="password" id="key-lmnt" placeholder="your api key" autocomplete="off" />
+          <button class="btn-reveal" data-for="key-lmnt">Show</button>
+        </div>
+      </div>
+    </div>
+
+    <button id="btn-save-keys" class="btn-primary large">Save Keys</button>
   </main>
 </div>
 
@@ -69,12 +165,10 @@
   <div class="modal-box">
     <h2>New Voice</h2>
     <p class="modal-sub">Give your voice a name and choose how to train it.</p>
-
     <div class="field">
       <label for="new-voice-name">Voice name</label>
       <input id="new-voice-name" type="text" placeholder="e.g. My Voice, John, Narrator…" maxlength="100" />
     </div>
-
     <div class="source-grid">
       <button class="source-btn active" data-source="microphone">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -87,8 +181,7 @@
       <button class="source-btn" data-source="upload">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
         <span>Upload File</span>
         <small>MP3, WAV, M4A…</small>
@@ -102,25 +195,19 @@
         <small>Paste a URL</small>
       </button>
     </div>
-
-    <!-- upload panel -->
     <div id="panel-upload" class="source-panel hidden">
-      <label class="file-drop" id="file-drop-zone">
+      <label class="file-drop">
         <input type="file" id="upload-file-input" accept="audio/*,video/*" />
         <span>Drop audio file here or click to browse</span>
       </label>
     </div>
-
-    <!-- youtube panel -->
     <div id="panel-youtube" class="source-panel hidden">
       <div class="field">
         <label for="yt-url">YouTube URL</label>
         <input id="yt-url" type="url" placeholder="https://youtube.com/watch?v=…" />
       </div>
     </div>
-
     <div id="create-error" class="error-msg hidden"></div>
-
     <div class="modal-actions">
       <button id="btn-create-cancel" class="btn-ghost">Cancel</button>
       <button id="btn-create-confirm" class="btn-primary">Create &amp; Train</button>
@@ -131,7 +218,7 @@
 <!-- ── Train view ─────────────────────────────────────────────────────────────── -->
 <div id="view-train" class="view">
   <header class="app-header">
-    <button id="train-back" class="btn-icon" title="Back">
+    <button id="train-back" class="btn-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="15 18 9 12 15 6"/>
       </svg>
@@ -142,14 +229,12 @@
     </div>
     <button id="btn-train-done" class="btn-ghost hidden">Done improving</button>
   </header>
-
   <main class="train-main">
     <div id="train-intro" class="train-intro">
       <h2>Read each sentence aloud</h2>
       <p>Speak naturally at a comfortable pace. The more clearly you read, the better your voice will sound.</p>
       <button id="btn-start-train" class="btn-primary large">Start Recording</button>
     </div>
-
     <div id="train-session" class="hidden">
       <div class="train-progress-row">
         <span id="train-counter" class="train-counter"></span>
@@ -157,26 +242,21 @@
           <div id="train-progress" class="progress-bar-fill"></div>
         </div>
       </div>
-
       <div class="sentence-card">
         <p id="train-sentence" class="sentence-text"></p>
       </div>
-
       <canvas id="waveform-canvas" class="waveform" width="600" height="80"></canvas>
-
       <div class="record-controls">
         <button id="btn-record" class="record-btn">
           <span class="record-icon"></span>
         </button>
         <span id="record-label" class="record-label">Press to record</span>
       </div>
-
       <div class="train-nav">
         <button id="btn-skip" class="btn-ghost small">Skip</button>
         <div id="train-quality" class="quality-badge"></div>
       </div>
     </div>
-
     <div id="train-complete" class="train-complete hidden">
       <div class="complete-icon">✓</div>
       <h2>Voice ready</h2>
@@ -192,7 +272,7 @@
 <!-- ── Speak view ─────────────────────────────────────────────────────────────── -->
 <div id="view-speak" class="view">
   <header class="app-header">
-    <button id="speak-back" class="btn-icon" title="Back">
+    <button id="speak-back" class="btn-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="15 18 9 12 15 6"/>
       </svg>
@@ -203,25 +283,19 @@
     </div>
     <button id="btn-continue-training" class="btn-ghost small">Continue training</button>
   </header>
-
   <main class="speak-main">
     <div class="speak-form">
       <label for="speak-text" class="speak-label">What should this voice say?</label>
-      <textarea id="speak-text" class="speak-textarea"
-                placeholder="Type anything here…"
-                maxlength="1500" rows="6"></textarea>
+      <textarea id="speak-text" class="speak-textarea" placeholder="Type anything here…" maxlength="1500" rows="6"></textarea>
       <div class="speak-meta">
         <span id="char-count" class="char-count">0 / 1500</span>
       </div>
     </div>
-
     <div id="speak-error" class="error-msg hidden"></div>
-
     <button id="btn-generate" class="btn-primary large">
       <span id="generate-label">Generate Speech</span>
       <span id="generate-spinner" class="spinner hidden"></span>
     </button>
-
     <div id="audio-section" class="audio-section hidden">
       <audio id="audio-player" controls></audio>
       <button id="btn-download" class="btn-ghost small">
@@ -239,6 +313,6 @@
 <!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
 <div id="toast" class="toast hidden"></div>
 
-<script src="/static/js/app.js"></script>
+<script src="static/js/app.js"></script>
 </body>
 </html>
