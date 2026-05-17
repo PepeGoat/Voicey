@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceStudio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ── Auth ─────────────────────────────────────────────────────────────────── -->
+<div id="view-auth" class="view active">
+  <div class="auth-wrap">
+    <div class="auth-logo">
+      <span class="logo-mark">VS</span>
+      <span class="logo-text">VoiceStudio</span>
+    </div>
+    <p class="auth-sub">Clone and speak in any voice.</p>
+
+    <div class="tab-row">
+      <button class="tab active" data-tab="login">Sign in</button>
+      <button class="tab" data-tab="register">Create account</button>
+    </div>
+
+    <form id="form-auth" autocomplete="off" novalidate>
+      <div class="field">
+        <label for="auth-username">Username</label>
+        <input id="auth-username" type="text" placeholder="your username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <div id="auth-error" class="error-msg hidden"></div>
+      <button type="submit" id="auth-submit" class="btn-primary full">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── Dashboard ─────────────────────────────────────────────────────────────── -->
+<div id="view-dashboard" class="view">
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="logo-mark">VS</span>
+      <span class="logo-text">VoiceStudio</span>
+    </div>
+    <div class="header-right">
+      <span id="header-username" class="header-user"></span>
+      <button id="btn-logout" class="btn-ghost">Sign out</button>
+    </div>
+  </header>
+
+  <main class="dashboard-main">
+    <div class="section-header">
+      <h1>Your Voices</h1>
+      <div id="tts-status" class="status-chip hidden"></div>
+    </div>
+
+    <div id="voice-grid" class="voice-grid">
+      <!-- populated by JS -->
+    </div>
+  </main>
+</div>
+
+<!-- ── Create voice modal ─────────────────────────────────────────────────────── -->
+<div id="modal-create" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>New Voice</h2>
+    <p class="modal-sub">Give your voice a name and choose how to train it.</p>
+
+    <div class="field">
+      <label for="new-voice-name">Voice name</label>
+      <input id="new-voice-name" type="text" placeholder="e.g. My Voice, John, Narrator…" maxlength="100" />
+    </div>
+
+    <div class="source-grid">
+      <button class="source-btn active" data-source="microphone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+        </svg>
+        <span>Microphone</span>
+        <small>Record yourself</small>
+      </button>
+      <button class="source-btn" data-source="upload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>Upload File</span>
+        <small>MP3, WAV, M4A…</small>
+      </button>
+      <button class="source-btn" data-source="youtube">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/>
+          <polyline points="17 2 12 7 7 2"/>
+        </svg>
+        <span>YouTube</span>
+        <small>Paste a URL</small>
+      </button>
+    </div>
+
+    <!-- upload panel -->
+    <div id="panel-upload" class="source-panel hidden">
+      <label class="file-drop" id="file-drop-zone">
+        <input type="file" id="upload-file-input" accept="audio/*,video/*" />
+        <span>Drop audio file here or click to browse</span>
+      </label>
+    </div>
+
+    <!-- youtube panel -->
+    <div id="panel-youtube" class="source-panel hidden">
+      <div class="field">
+        <label for="yt-url">YouTube URL</label>
+        <input id="yt-url" type="url" placeholder="https://youtube.com/watch?v=…" />
+      </div>
+    </div>
+
+    <div id="create-error" class="error-msg hidden"></div>
+
+    <div class="modal-actions">
+      <button id="btn-create-cancel" class="btn-ghost">Cancel</button>
+      <button id="btn-create-confirm" class="btn-primary">Create &amp; Train</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Train view ─────────────────────────────────────────────────────────────── -->
+<div id="view-train" class="view">
+  <header class="app-header">
+    <button id="train-back" class="btn-icon" title="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <div class="header-title">
+      <span id="train-voice-name" class="view-title"></span>
+      <span id="train-mode-label" class="view-subtitle"></span>
+    </div>
+    <button id="btn-train-done" class="btn-ghost hidden">Done improving</button>
+  </header>
+
+  <main class="train-main">
+    <div id="train-intro" class="train-intro">
+      <h2>Read each sentence aloud</h2>
+      <p>Speak naturally at a comfortable pace. The more clearly you read, the better your voice will sound.</p>
+      <button id="btn-start-train" class="btn-primary large">Start Recording</button>
+    </div>
+
+    <div id="train-session" class="hidden">
+      <div class="train-progress-row">
+        <span id="train-counter" class="train-counter"></span>
+        <div class="progress-bar-wrap">
+          <div id="train-progress" class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="sentence-card">
+        <p id="train-sentence" class="sentence-text"></p>
+      </div>
+
+      <canvas id="waveform-canvas" class="waveform" width="600" height="80"></canvas>
+
+      <div class="record-controls">
+        <button id="btn-record" class="record-btn">
+          <span class="record-icon"></span>
+        </button>
+        <span id="record-label" class="record-label">Press to record</span>
+      </div>
+
+      <div class="train-nav">
+        <button id="btn-skip" class="btn-ghost small">Skip</button>
+        <div id="train-quality" class="quality-badge"></div>
+      </div>
+    </div>
+
+    <div id="train-complete" class="train-complete hidden">
+      <div class="complete-icon">✓</div>
+      <h2>Voice ready</h2>
+      <p id="train-complete-sub"></p>
+      <div class="complete-actions">
+        <button id="btn-go-speak" class="btn-primary large">Start Speaking</button>
+        <button id="btn-continue-from-complete" class="btn-ghost">Keep improving</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ── Speak view ─────────────────────────────────────────────────────────────── -->
+<div id="view-speak" class="view">
+  <header class="app-header">
+    <button id="speak-back" class="btn-icon" title="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+    </button>
+    <div class="header-title">
+      <span id="speak-voice-name" class="view-title"></span>
+      <span id="speak-voice-stats" class="view-subtitle"></span>
+    </div>
+    <button id="btn-continue-training" class="btn-ghost small">Continue training</button>
+  </header>
+
+  <main class="speak-main">
+    <div class="speak-form">
+      <label for="speak-text" class="speak-label">What should this voice say?</label>
+      <textarea id="speak-text" class="speak-textarea"
+                placeholder="Type anything here…"
+                maxlength="1500" rows="6"></textarea>
+      <div class="speak-meta">
+        <span id="char-count" class="char-count">0 / 1500</span>
+      </div>
+    </div>
+
+    <div id="speak-error" class="error-msg hidden"></div>
+
+    <button id="btn-generate" class="btn-primary large">
+      <span id="generate-label">Generate Speech</span>
+      <span id="generate-spinner" class="spinner hidden"></span>
+    </button>
+
+    <div id="audio-section" class="audio-section hidden">
+      <audio id="audio-player" controls></audio>
+      <button id="btn-download" class="btn-ghost small">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Save audio
+      </button>
+    </div>
+  </main>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
