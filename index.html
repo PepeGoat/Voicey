@@ -3,314 +3,381 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VoiceStudio</title>
+  <title>Voicey — clone &amp; speak in any voice</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="static/css/style.css" />
 </head>
-<body>
+<body class="app" id="app-root">
 
-<!-- ── Auth ─────────────────────────────────────────────────────────────────── -->
-<div id="view-auth" class="view active">
-  <div class="auth-wrap">
-    <div class="auth-logo">
-      <span class="logo-mark">VS</span>
-      <span class="logo-text">VoiceStudio</span>
-    </div>
-    <p class="auth-sub">Clone and speak in any voice.</p>
-    <div class="tab-row">
-      <button class="tab active" data-tab="login">Sign in</button>
-      <button class="tab" data-tab="register">Create account</button>
-    </div>
-    <form id="form-auth" autocomplete="off" novalidate>
-      <div class="field">
-        <label for="auth-username">Username</label>
-        <input id="auth-username" type="text" placeholder="your username" autocomplete="username" />
-      </div>
-      <div class="field">
-        <label for="auth-password">Password</label>
-        <input id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password" />
-      </div>
-      <div id="auth-error" class="error-msg hidden"></div>
-      <button type="submit" id="auth-submit" class="btn-primary full">Sign in</button>
-    </form>
-    <p class="auth-note">Everything is stored only in your browser.</p>
+<!-- Grain overlay (shown when signed in) -->
+<div id="app-grain" class="hero-grain" aria-hidden></div>
+
+<!-- Nav (always visible) -->
+<nav class="nav" id="app-nav">
+  <div class="brand">
+    <span class="dot"></span>
+    Voice<em>y</em>
   </div>
-</div>
+  <div class="nav-meta" id="nav-meta">
+    <span class="pill">v1.0 · BETA</span>
+  </div>
+</nav>
 
-<!-- ── Dashboard ─────────────────────────────────────────────────────────────── -->
-<div id="view-dashboard" class="view">
-  <header class="app-header">
-    <div class="header-logo">
-      <span class="logo-mark">VS</span>
-      <span class="logo-text">VoiceStudio</span>
-    </div>
-    <div class="header-right">
-      <span id="header-username" class="header-user"></span>
-      <button id="btn-settings" class="btn-icon" title="API Keys">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-      </button>
-      <button id="btn-logout" class="btn-ghost">Sign out</button>
-    </div>
-  </header>
-  <main class="dashboard-main">
-    <div class="section-header">
-      <h1>Your Voices</h1>
-      <div id="provider-badges" class="provider-badges"></div>
-    </div>
-    <div id="no-keys-banner" class="no-keys-banner hidden">
-      No API keys set up yet. <button id="btn-banner-settings" class="inline-link">Add keys →</button>
-    </div>
-    <div id="voice-grid" class="voice-grid"></div>
-  </main>
-</div>
+<!-- Main content -->
+<div class="content" id="app-content">
 
-<!-- ── Settings ───────────────────────────────────────────────────────────────── -->
-<div id="view-settings" class="view">
-  <header class="app-header">
-    <button id="settings-back" class="btn-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-    <div class="header-title">
-      <span class="view-title">API Keys</span>
-      <span class="view-subtitle">Stored locally in your browser only</span>
-    </div>
-  </header>
-  <main class="settings-main">
-    <p class="settings-intro">Add keys for as many providers as you like. Synthesis rotates between them automatically so free tiers last much longer. All free tiers — no card needed to start.</p>
-
-    <div class="settings-section">
-      <div class="settings-provider-head">
+  <!-- ── Auth ──────────────────────────────────────────────────────────────── -->
+  <div id="view-auth" class="view active stage">
+    <div class="auth">
+      <div class="auth-art">
         <div>
-          <h3>ElevenLabs</h3>
-          <p class="settings-free">10,000 characters / month free</p>
+          <div class="eyebrow" style="margin-bottom:24px">EST. 2026 · BROWSER-NATIVE</div>
+          <h2 class="display" style="font-size:clamp(52px,7vw,88px);margin:0 0 36px;max-width:540px;line-height:1.05">
+            Your voice, <em style="color:var(--accent)">cloned</em>.
+          </h2>
+          <p class="muted" style="max-width:440px;font-size:17px;line-height:1.6">
+            Record a minute, train a model, speak any text in your own voice. No card, no servers, no audit trail — everything stays in your browser.
+          </p>
         </div>
-        <a href="https://elevenlabs.io" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
-      </div>
-      <div class="field">
-        <label>API Key <span class="key-path">Profile → API Keys</span></label>
-        <div class="key-row">
-          <input type="password" id="key-elevenlabs" placeholder="sk_…" autocomplete="off" />
-          <button class="btn-reveal" data-for="key-elevenlabs">Show</button>
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <div id="auth-waveform" style="color:var(--accent)"></div>
+          <div class="row" style="gap:14px;flex-wrap:wrap">
+            <span class="chip">ElevenLabs</span>
+            <span class="chip">Play.ht</span>
+            <span class="chip">Cartesia</span>
+            <span class="chip">LMNT</span>
+            <span class="dim mono" style="font-size:12px">4 providers · auto-rotated</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="settings-section">
-      <div class="settings-provider-head">
-        <div>
-          <h3>Play.ht</h3>
-          <p class="settings-free">12,500 words / month free</p>
-        </div>
-        <a href="https://play.ht" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
-      </div>
-      <div class="field">
-        <label>Secret Key <span class="key-path">Dashboard → API Access</span></label>
-        <div class="key-row">
-          <input type="password" id="key-playht-secret" placeholder="your secret key" autocomplete="off" />
-          <button class="btn-reveal" data-for="key-playht-secret">Show</button>
-        </div>
-      </div>
-      <div class="field">
-        <label>User ID</label>
-        <input type="text" id="key-playht-user" placeholder="your user id" autocomplete="off" />
-      </div>
-    </div>
+      <div class="auth-form">
+        <div class="eyebrow" style="margin-bottom:12px" id="auth-eyebrow">WELCOME BACK</div>
+        <h3 class="display" style="font-size:44px;margin:0 0 8px" id="auth-heading">Sign in.</h3>
+        <p class="muted" style="margin:0 0 32px" id="auth-sub">Everything is stored only in this browser. We can't reset what we can't see.</p>
 
-    <div class="settings-section">
-      <div class="settings-provider-head">
-        <div>
-          <h3>Cartesia</h3>
-          <p class="settings-free">$5 credit / month free</p>
-        </div>
-        <a href="https://cartesia.ai" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
-      </div>
-      <div class="field">
-        <label>API Key <span class="key-path">Dashboard → API Keys</span></label>
-        <div class="key-row">
-          <input type="password" id="key-cartesia" placeholder="your api key" autocomplete="off" />
-          <button class="btn-reveal" data-for="key-cartesia">Show</button>
-        </div>
-      </div>
-    </div>
+        <form id="form-auth" autocomplete="off" novalidate style="display:flex;flex-direction:column;gap:18px;max-width:420px">
+          <div class="field">
+            <label for="auth-username">Username</label>
+            <input id="auth-username" class="input" placeholder="ada_lovelace" autocomplete="username" />
+          </div>
+          <div class="field">
+            <label for="auth-password">Password</label>
+            <input id="auth-password" type="password" class="input" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <div id="auth-error" class="error-msg hidden"></div>
+          <button type="submit" id="auth-submit" class="btn primary" style="margin-top:8px;height:52px;justify-content:center">
+            Sign in
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </button>
+          <div class="row" style="margin-top:6px;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink-low)"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <span class="dim" style="font-size:12.5px">Encrypted with your password, kept in this browser.</span>
+          </div>
+        </form>
 
-    <div class="settings-section">
-      <div class="settings-provider-head">
-        <div>
-          <h3>LMNT</h3>
-          <p class="settings-free">500 utterances / month free</p>
-        </div>
-        <a href="https://lmnt.com" target="_blank" rel="noopener" class="settings-signup">Sign up free →</a>
-      </div>
-      <div class="field">
-        <label>API Key <span class="key-path">Dashboard → API Key</span></label>
-        <div class="key-row">
-          <input type="password" id="key-lmnt" placeholder="your api key" autocomplete="off" />
-          <button class="btn-reveal" data-for="key-lmnt">Show</button>
+        <div style="margin-top:36px;font-size:14px" id="auth-mode-switch">
+          <span class="muted">New here? <a class="link" id="auth-toggle" href="#">Create account →</a></span>
         </div>
       </div>
-    </div>
-
-    <button id="btn-save-keys" class="btn-primary large">Save Keys</button>
-  </main>
-</div>
-
-<!-- ── Create voice modal ─────────────────────────────────────────────────────── -->
-<div id="modal-create" class="modal-overlay hidden">
-  <div class="modal-box">
-    <h2>New Voice</h2>
-    <p class="modal-sub">Give your voice a name and choose how to train it.</p>
-    <div class="field">
-      <label for="new-voice-name">Voice name</label>
-      <input id="new-voice-name" type="text" placeholder="e.g. My Voice, John, Narrator…" maxlength="100" />
-    </div>
-    <div class="source-grid">
-      <button class="source-btn active" data-source="microphone">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
-        </svg>
-        <span>Microphone</span>
-        <small>Record yourself</small>
-      </button>
-      <button class="source-btn" data-source="upload">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        <span>Upload File</span>
-        <small>MP3, WAV, M4A…</small>
-      </button>
-      <button class="source-btn" data-source="youtube">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/>
-          <polyline points="17 2 12 7 7 2"/>
-        </svg>
-        <span>YouTube</span>
-        <small>Paste a URL</small>
-      </button>
-    </div>
-    <div id="panel-upload" class="source-panel hidden">
-      <label class="file-drop">
-        <input type="file" id="upload-file-input" accept="audio/*,video/*" />
-        <span>Drop audio file here or click to browse</span>
-      </label>
-    </div>
-    <div id="panel-youtube" class="source-panel hidden">
-      <div class="field">
-        <label for="yt-url">YouTube URL</label>
-        <input id="yt-url" type="url" placeholder="https://youtube.com/watch?v=…" />
-      </div>
-    </div>
-    <div id="create-error" class="error-msg hidden"></div>
-    <div class="modal-actions">
-      <button id="btn-create-cancel" class="btn-ghost">Cancel</button>
-      <button id="btn-create-confirm" class="btn-primary">Create &amp; Train</button>
     </div>
   </div>
-</div>
 
-<!-- ── Train view ─────────────────────────────────────────────────────────────── -->
-<div id="view-train" class="view">
-  <header class="app-header">
-    <button id="train-back" class="btn-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-    <div class="header-title">
-      <span id="train-voice-name" class="view-title"></span>
-      <span id="train-mode-label" class="view-subtitle"></span>
-    </div>
-    <button id="btn-train-done" class="btn-ghost hidden">Done improving</button>
-  </header>
-  <main class="train-main">
-    <div id="train-intro" class="train-intro">
-      <h2>Read each sentence aloud</h2>
-      <p>Speak naturally at a comfortable pace. The more clearly you read, the better your voice will sound.</p>
-      <button id="btn-start-train" class="btn-primary large">Start Recording</button>
-    </div>
-    <div id="train-session" class="hidden">
-      <div class="train-progress-row">
-        <span id="train-counter" class="train-counter"></span>
-        <div class="progress-bar-wrap">
-          <div id="train-progress" class="progress-bar-fill"></div>
+  <!-- ── Dashboard ─────────────────────────────────────────────────────────── -->
+  <div id="view-dashboard" class="view stage">
+    <div class="container">
+      <div class="between" style="align-items:flex-end;margin-bottom:24px;gap:24px">
+        <div>
+          <div class="eyebrow" style="margin-bottom:10px">YOUR LIBRARY</div>
+          <h1 class="display" style="font-size:56px;margin:0" id="dash-heading">Your voices.</h1>
+          <p class="muted" id="dash-sub" style="margin:12px 0 0;max-width:540px"></p>
+        </div>
+        <div class="row" style="gap:12px;flex-shrink:0">
+          <button class="btn" id="btn-open-keys">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M16 6l3 3"/></svg>
+            <span id="keys-btn-label">Add keys</span>
+          </button>
+          <button class="btn primary" id="btn-new-voice">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            New voice
+          </button>
         </div>
       </div>
-      <div class="sentence-card">
-        <p id="train-sentence" class="sentence-text"></p>
+
+      <div id="dash-key-banner" class="card hidden" style="margin-bottom:24px;display:flex;align-items:center;gap:20px;border-color:color-mix(in oklch, var(--accent) 30%, var(--line));background:color-mix(in oklch, var(--accent) 6%, var(--bg-2))">
+        <div style="width:44px;height:44px;border-radius:999px;background:color-mix(in oklch, var(--accent) 22%, transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9M16 6l3 3"/></svg>
+        </div>
+        <div class="grow">
+          <div style="font-weight:600;margin-bottom:2px">Add a TTS provider key to speak.</div>
+          <div class="muted" style="font-size:13.5px">All four providers offer free tiers — no card needed. Voicey rotates between them so you stay free for longer.</div>
+        </div>
+        <button class="btn primary small" id="btn-banner-keys">Add keys →</button>
       </div>
-      <canvas id="waveform-canvas" class="waveform" width="600" height="80"></canvas>
-      <div class="record-controls">
-        <button id="btn-record" class="record-btn">
-          <span class="record-icon"></span>
+
+      <div id="voice-grid" class="voices-grid"></div>
+
+      <div style="margin-top:64px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding-top:32px;border-top:1px solid var(--line)">
+        <div>
+          <div class="mono" style="color:var(--accent);font-size:13px;margin-bottom:8px">01</div>
+          <div class="display" style="font-size:24px;margin-bottom:6px">Capture</div>
+          <div class="muted" style="font-size:14px;max-width:300px">60–90 seconds of clean speech. Mic, file, or a YouTube link.</div>
+        </div>
+        <div>
+          <div class="mono" style="color:var(--accent);font-size:13px;margin-bottom:8px">02</div>
+          <div class="display" style="font-size:24px;margin-bottom:6px">Refine</div>
+          <div class="muted" style="font-size:14px;max-width:300px">Read short prompts back. Each pass sharpens the model.</div>
+        </div>
+        <div>
+          <div class="mono" style="color:var(--accent);font-size:13px;margin-bottom:8px">03</div>
+          <div class="display" style="font-size:24px;margin-bottom:6px">Speak</div>
+          <div class="muted" style="font-size:14px;max-width:300px">Type anything up to 1,500 chars. Pick a voice. Generate.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── New Voice ─────────────────────────────────────────────────────────── -->
+  <div id="view-new" class="view stage">
+    <div class="container" style="max-width:880px">
+      <div class="between" style="margin-bottom:32px">
+        <button class="btn ghost" id="btn-new-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 5l-7 7 7 7"/></svg>
+          Back
         </button>
-        <span id="record-label" class="record-label">Press to record</span>
+        <div class="eyebrow">STEP 1 OF 3 · CAPTURE</div>
+        <div class="dots"><i data-on></i><i></i><i></i></div>
       </div>
-      <div class="train-nav">
-        <button id="btn-skip" class="btn-ghost small">Skip</button>
-        <div id="train-quality" class="quality-badge"></div>
-      </div>
-    </div>
-    <div id="train-complete" class="train-complete hidden">
-      <div class="complete-icon">✓</div>
-      <h2>Voice ready</h2>
-      <p id="train-complete-sub"></p>
-      <div class="complete-actions">
-        <button id="btn-go-speak" class="btn-primary large">Start Speaking</button>
-        <button id="btn-continue-from-complete" class="btn-ghost">Keep improving</button>
-      </div>
-    </div>
-  </main>
-</div>
 
-<!-- ── Speak view ─────────────────────────────────────────────────────────────── -->
-<div id="view-speak" class="view">
-  <header class="app-header">
-    <button id="speak-back" class="btn-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-    </button>
-    <div class="header-title">
-      <span id="speak-voice-name" class="view-title"></span>
-      <span id="speak-voice-stats" class="view-subtitle"></span>
-    </div>
-    <button id="btn-continue-training" class="btn-ghost small">Continue training</button>
-  </header>
-  <main class="speak-main">
-    <div class="speak-form">
-      <label for="speak-text" class="speak-label">What should this voice say?</label>
-      <textarea id="speak-text" class="speak-textarea" placeholder="Type anything here…" maxlength="1500" rows="6"></textarea>
-      <div class="speak-meta">
-        <span id="char-count" class="char-count">0 / 1500</span>
+      <h1 class="display" style="font-size:64px;margin:0 0 14px">New voice.</h1>
+      <p class="muted" style="margin:0 0 36px;max-width:520px;font-size:16px">
+        Give it a name, then drop in a clean minute of audio. Speech only — music and background chatter make for muddy clones.
+      </p>
+
+      <div class="field" style="margin-bottom:32px;max-width:480px">
+        <label for="new-voice-name">Voice name</label>
+        <input id="new-voice-name" class="input" placeholder="My speaking voice" maxlength="100" />
+      </div>
+
+      <div class="eyebrow" style="margin-bottom:12px">SOURCE</div>
+      <div class="tabs" style="margin-bottom:20px" id="new-source-tabs">
+        <button class="on" data-src="mic">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+          Microphone
+        </button>
+        <button data-src="upload">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>
+          Upload file
+        </button>
+        <button data-src="yt">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M11 9.5l4 2.5-4 2.5z" fill="currentColor"/></svg>
+          YouTube
+        </button>
+      </div>
+
+      <div id="new-src-mic" class="rec-card">
+        <button class="rec-btn" id="new-rec-btn">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+        </button>
+        <div style="text-align:center">
+          <div class="display" style="font-size:28px;margin-bottom:6px" id="new-rec-label">Tap to record</div>
+          <div class="mono dim" style="font-size:14px"><span id="new-rec-timer">0:00</span> · target 60–90s</div>
+        </div>
+        <div id="new-rec-waveform" style="height:48px;color:var(--accent);width:100%;max-width:420px"></div>
+        <div class="row hidden" id="new-rec-dot-row" style="color:var(--danger)">
+          <span class="rec-dot"></span>
+          <span class="mono" style="font-size:12px;text-transform:uppercase;letter-spacing:.1em">REC</span>
+        </div>
+        <button class="btn small ghost hidden" id="new-rec-redo">Re-record</button>
+      </div>
+
+      <div id="new-src-upload" class="drop hidden">
+        <label style="display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ink-mid)"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>
+          <div class="display" style="font-size:24px" id="upload-label">Drop an audio file here</div>
+          <div class="muted" id="upload-sub">or click to browse · MP3, WAV, M4A · up to 50 MB</div>
+          <input type="file" id="upload-file-input" accept="audio/*,video/*" style="display:none" />
+        </label>
+      </div>
+
+      <div id="new-src-yt" class="card hidden">
+        <div class="field">
+          <label for="yt-url">YouTube URL</label>
+          <input id="yt-url" class="input mono" placeholder="https://youtube.com/watch?v=…" />
+        </div>
+        <div class="muted" style="font-size:13px;margin-top:12px;display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent)"><path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6z"/><path d="M19 14l.8 2.4L22 17l-2.2.6L19 20l-.8-2.4L16 17l2.2-.6z"/></svg>
+          We'll strip music and pull only the clearest 90 seconds of speech.
+        </div>
+      </div>
+
+      <div id="new-error" class="error-msg hidden"></div>
+
+      <div class="between" style="margin-top:40px">
+        <button class="btn ghost" id="btn-new-cancel">Cancel</button>
+        <button class="btn primary" id="btn-new-create" disabled style="opacity:0.4">
+          Create &amp; train
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
       </div>
     </div>
-    <div id="speak-error" class="error-msg hidden"></div>
-    <button id="btn-generate" class="btn-primary large">
-      <span id="generate-label">Generate Speech</span>
-      <span id="generate-spinner" class="spinner hidden"></span>
-    </button>
-    <div id="audio-section" class="audio-section hidden">
-      <audio id="audio-player" controls></audio>
-      <button id="btn-download" class="btn-ghost small">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        Save audio
+  </div>
+
+  <!-- ── Training ──────────────────────────────────────────────────────────── -->
+  <div id="view-train" class="view stage">
+    <div class="container" style="max-width:920px">
+      <div class="between" style="margin-bottom:32px">
+        <button class="btn ghost" id="btn-train-done">Done improving</button>
+        <div class="eyebrow" id="train-step-eyebrow">STEP 2 OF 3 · REFINE</div>
+        <div class="dots" id="train-dots">
+          <i data-done></i><i data-on></i><i></i>
+        </div>
+      </div>
+
+      <div class="row" style="gap:14px;margin-bottom:14px">
+        <span class="chip accent" id="train-chip"></span>
+        <span class="dim mono" style="font-size:12px" id="train-counter"></span>
+      </div>
+
+      <h1 class="display" style="font-size:48px;margin:0 0 36px;max-width:720px">Read each sentence aloud.</h1>
+
+      <div class="prompt-card">
+        <div class="eyebrow" style="margin-bottom:18px" id="train-prompt-num">PROMPT 01</div>
+        <p class="display" id="train-sentence" style="font-size:36px;line-height:1.2;margin:0 0 36px;font-style:italic"></p>
+        <div class="between">
+          <div class="row" style="gap:14px">
+            <button class="rec-btn" id="btn-record" style="width:64px;height:64px">
+              <svg id="rec-btn-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+            </button>
+            <div>
+              <div style="font-weight:500" id="rec-state-label">Start recording</div>
+              <div class="mono dim" style="font-size:12px">Speak naturally at a comfortable pace.</div>
+            </div>
+          </div>
+          <div id="train-waveform" style="height:36px;width:140px;color:var(--accent)"></div>
+        </div>
+      </div>
+
+      <div class="between" style="margin-top:28px">
+        <button class="btn ghost" id="btn-skip">Skip</button>
+        <button class="btn primary" id="btn-next-sentence" disabled style="opacity:0.4">
+          Next sentence
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Speak ─────────────────────────────────────────────────────────────── -->
+  <div id="view-speak" class="view stage">
+    <div class="container" style="max-width:920px">
+      <div class="between" style="margin-bottom:32px">
+        <button class="btn ghost" id="speak-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 5l-7 7 7 7"/></svg>
+          Library
+        </button>
+        <div class="eyebrow">STEP 3 OF 3 · SPEAK</div>
+        <div class="dots"><i data-done></i><i data-done></i><i data-on></i></div>
+      </div>
+
+      <div class="row" style="gap:14px;margin-bottom:16px">
+        <span class="chip accent">Voice ready</span>
+        <span class="dim mono" style="font-size:12px" id="speak-provider-info">via ElevenLabs · rotated</span>
+      </div>
+
+      <h1 class="display" style="font-size:64px;margin:0 0 6px" id="speak-voice-name"></h1>
+      <p class="muted" style="margin:0 0 32px;font-size:17px">Type below and I'll speak it back in your voice.</p>
+
+      <div class="field" style="margin-bottom:14px">
+        <div class="between">
+          <label for="speak-text">Script</label>
+          <span class="dim mono" style="font-size:11px" id="char-count">0 / 1500</span>
+        </div>
+        <textarea id="speak-text" class="textarea" maxlength="1500"
+          style="min-height:160px;font-size:17px;line-height:1.5"
+          placeholder="Welcome back. The studio is open, and your voice is ready when you are."></textarea>
+      </div>
+
+      <div id="speak-error" class="error-msg hidden"></div>
+
+      <div class="between" style="margin-bottom:24px">
+        <button class="btn small" id="btn-keep-improving">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.4L19 9l-5.2 1.6L12 16l-1.8-5.4L5 9l5.2-1.6z"/><path d="M19 14l.8 2.4L22 17l-2.2.6L19 20l-.8-2.4L16 17l2.2-.6z"/></svg>
+          Keep improving
+        </button>
+        <button class="btn primary" id="btn-generate">
+          <span id="generate-label">Generate speech</span>
+          <span id="generate-spinner" class="spinner hidden"></span>
+          <svg id="generate-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4"/><path d="M7 7v10"/><path d="M11 4v16"/><path d="M15 8v8"/><path d="M19 10v4"/></svg>
+        </button>
+      </div>
+
+      <div id="audio-card" class="card hidden">
+        <div class="between" style="margin-bottom:16px">
+          <div class="eyebrow">OUTPUT</div>
+          <div class="dim mono" style="font-size:11px" id="audio-meta">Routing through fastest provider…</div>
+        </div>
+        <div id="audio-waveform-wrap" style="height:64px;color:var(--accent);margin-bottom:4px"></div>
+        <div id="audio-player-wrap" class="hidden">
+          <div class="player">
+            <button class="btn icon primary" style="width:44px;height:44px;border-radius:999px" id="play-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <audio id="audio-player" style="display:none"></audio>
+            <div id="player-wave" style="flex:1;height:36px;color:var(--accent)"></div>
+            <div class="mono dim" style="font-size:12px" id="player-time">0:00</div>
+          </div>
+          <div class="between" style="margin-top:16px">
+            <div class="dim" style="font-size:13px" id="audio-cost"></div>
+            <div class="row" style="gap:8px">
+              <button class="btn small ghost" id="btn-download">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
+                Download
+              </button>
+              <button class="btn small" id="btn-save-lib">Save to library</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app-content -->
+
+<!-- ── Keys Sheet ─────────────────────────────────────────────────────────── -->
+<div id="keys-sheet" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="between" style="padding:22px 28px;border-bottom:1px solid var(--line)">
+      <div>
+        <div class="eyebrow">SETTINGS</div>
+        <div class="display" style="font-size:30px;margin-top:4px">API keys</div>
+      </div>
+      <button class="btn icon ghost" id="btn-close-keys">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-  </main>
+    <div style="padding:22px 28px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex-shrink:0"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <div class="grow">
+        <div style="font-weight:500">Stored locally in your browser, encrypted with your password.</div>
+        <div class="muted" style="font-size:13px">Add as many as you like — Voicey rotates between them so free tiers last longer.</div>
+      </div>
+      <div class="chip accent" id="keys-count-chip">0/4 added</div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:22px 28px" id="keys-list-wrap"></div>
+    <div class="between" style="padding:18px 28px;border-top:1px solid var(--line)">
+      <button class="btn ghost" id="btn-keys-cancel">Cancel</button>
+      <button class="btn primary" id="btn-keys-save">
+        Save keys
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>
+      </button>
+    </div>
+  </div>
 </div>
 
-<!-- ── Toast ─────────────────────────────────────────────────────────────────── -->
+<!-- Toast -->
 <div id="toast" class="toast hidden"></div>
 
 <script src="static/js/app.js"></script>

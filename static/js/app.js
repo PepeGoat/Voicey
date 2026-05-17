@@ -92,6 +92,13 @@ const S = {
   animFrame:     null,
   generatedURL:  null,
   generatedMime: 'audio/mpeg',
+  newRecBlob:    null,
+  newRecording:  false,
+  newStream:     null,
+  newMediaRec:   null,
+  newChunks:     [],
+  newRecTimer:   null,
+  newRecSecs:    0,
 };
 
 /* ── API Keys ─────────────────────────────────────────────────────────────── */
@@ -300,7 +307,7 @@ async function ensureOnProviders(voice) {
 
   const providers = configured();
   if (!providers.length)
-    throw new Error('No API keys configured. Open Settings (⚙) and add at least one key.');
+    throw new Error('No API keys configured. Click "Add keys" to add at least one key.');
 
   const needsUpload =
     voice.uploadedSampleCount < voice.sampleCount ||
@@ -308,7 +315,6 @@ async function ensureOnProviders(voice) {
 
   if (!needsUpload) return voice.providerMaps;
 
-  // Delete stale provider voices
   for (const p of providers) {
     if (voice.providerMaps[p.id]) {
       try { await p.del(voice.providerMaps[p.id]); } catch {}
@@ -352,7 +358,7 @@ async function synthesizeRotated(voice, text) {
   throw new Error('All providers failed.\n' + errors.join('\n'));
 }
 
-/* ── Training sentences ──────────────────────────────────────────────────────── */
+/* ── Training sentences ─────────────────────────────────────────────────── */
 const INITIAL_SENTENCES = [
   'The quick brown fox jumps over the lazy dog.',
   'Pack my box with five dozen liquor jugs.',
@@ -389,13 +395,49 @@ const EXTENDED_SENTENCES = [...INITIAL_SENTENCES,
   'The mountain trail was steep but the view from the top was absolutely breathtaking.',
 ];
 
-/* ── View router ─────────────────────────────────────────────────────────────── */
+/* ── Waveform helpers ───────────────────────────────────────────────────── */
+function createAnimatedWaveform(container, { bars = 24, height = 40, gap = 3, width = 3, seed = 1, animated = true } = {}) {
+  const heights = []; let s = seed * 1000;
+  for (let i = 0; i < bars; i++) {
+    s = (s * 9301 + 49297) % 233280;
+    heights.push(0.25 + (s / 233280) * 0.75);
+  }
+  container.style.cssText = `display:flex;align-items:center;gap:${gap}px;height:${height}px`;
+  heights.forEach((h, i) => {
+    const bar = document.createElement('span');
+    bar.style.cssText = `display:inline-block;width:${width}px;background:currentColor;border-radius:2px;height:${h * 100}%;transform-origin:center`;
+    if (animated) {
+      bar.classList.add('wf-bar');
+      bar.style.animationDelay = `${i * 0.03}s`;
+      bar.style.animationDuration = `${0.9 + (i % 5) * 0.12}s`;
+    }
+    container.appendChild(bar);
+  });
+}
+
+function createStaticWave(container, { bars = 56, height = 44, seed = 1 } = {}) {
+  const arr = []; let s = seed * 7919;
+  for (let i = 0; i < bars; i++) {
+    s = (s * 1103515245 + 12345) % 2147483648;
+    const v = 0.2 + (s / 2147483648) * 0.8;
+    const edge = Math.min(i, bars - 1 - i) / (bars * 0.18);
+    arr.push(v * Math.min(1, edge));
+  }
+  container.style.cssText = `display:flex;align-items:center;gap:2px;height:${height}px`;
+  arr.forEach(h => {
+    const bar = document.createElement('span');
+    bar.style.cssText = `flex:1;background:currentColor;border-radius:1px;height:${Math.max(8, h * 100)}%;opacity:${0.55 + h * 0.45}`;
+    container.appendChild(bar);
+  });
+}
+
+/* ── View router ────────────────────────────────────────────────────────── */
 function show(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
 }
 
-/* ── Toast ───────────────────────────────────────────────────────────────────── */
+/* ── Toast ──────────────────────────────────────────────────────────────── */
 let _toastTimer;
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -405,20 +447,39 @@ function toast(msg) {
   _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-/* ── Auth view ───────────────────────────────────────────────────────────────── */
+/* ── Auth view ──────────────────────────────────────────────────────────── */
 function initAuth() {
-  const tabs   = document.querySelectorAll('.tab');
-  const form   = document.getElementById('form-auth');
-  const submit = document.getElementById('auth-submit');
-  const err    = document.getElementById('auth-error');
-  let mode     = 'login';
+  const form    = document.getElementById('form-auth');
+  const submit  = document.getElementById('auth-submit');
+  const err     = document.getElementById('auth-error');
+  const toggle  = document.getElementById('auth-toggle');
+  const eyebrow = document.getElementById('auth-eyebrow');
+  const heading = document.getElementById('auth-heading');
+  const sub     = document.getElementById('auth-sub');
+  let mode = 'login';
 
-  tabs.forEach(t => t.addEventListener('click', () => {
-    mode = t.dataset.tab;
-    tabs.forEach(x => x.classList.toggle('active', x.dataset.tab === mode));
-    submit.textContent = mode === 'login' ? 'Sign in' : 'Create account';
+  // Animated waveform in left panel
+  const wfEl = document.getElementById('auth-waveform');
+  if (wfEl) createAnimatedWaveform(wfEl, { bars: 32, height: 48, gap: 4, width: 3, seed: 42, animated: true });
+
+  toggle.addEventListener('click', e => {
+    e.preventDefault();
+    mode = mode === 'login' ? 'register' : 'login';
+    if (mode === 'register') {
+      eyebrow.textContent  = 'NEW ACCOUNT';
+      heading.textContent  = 'Create account.';
+      sub.textContent      = 'Everything is stored only in this browser. We can\'t reset what we can\'t see.';
+      submit.textContent   = 'Create account';
+      toggle.textContent   = 'Already have one? Sign in →';
+    } else {
+      eyebrow.textContent  = 'WELCOME BACK';
+      heading.textContent  = 'Sign in.';
+      sub.textContent      = 'Everything is stored only in this browser. We can\'t reset what we can\'t see.';
+      submit.textContent   = 'Sign in';
+      toggle.textContent   = 'New here? Create account →';
+    }
     err.classList.add('hidden');
-  }));
+  });
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -426,7 +487,6 @@ function initAuth() {
     const password = document.getElementById('auth-password').value;
     err.classList.add('hidden');
     submit.disabled = true;
-    submit.textContent = mode === 'login' ? 'Signing in…' : 'Creating…';
     try {
       S.user = mode === 'login'
         ? await loginUser(username, password)
@@ -438,90 +498,107 @@ function initAuth() {
       err.classList.remove('hidden');
     } finally {
       submit.disabled = false;
-      submit.textContent = mode === 'login' ? 'Sign in' : 'Create account';
     }
   });
 }
 
-/* ── Dashboard ───────────────────────────────────────────────────────────────── */
+/* ── Dashboard ──────────────────────────────────────────────────────────── */
 function initDashboard() {
+  document.getElementById('app-grain').classList.add('on');
   show('view-dashboard');
-  document.getElementById('header-username').textContent = S.user.username;
 
+  // Update nav
+  const meta = document.getElementById('nav-meta');
+  meta.innerHTML = `
+    <span class="chip">${esc(S.user.username)}</span>
+    <button class="btn ghost small" id="btn-logout">Sign out</button>
+  `;
   document.getElementById('btn-logout').onclick = () => {
-    LS_SET('session', null); S.user = null; show('view-auth');
+    LS_SET('session', null); S.user = null;
+    document.getElementById('app-grain').classList.remove('on');
+    document.getElementById('nav-meta').innerHTML = '<span class="pill">v1.0 · BETA</span>';
+    show('view-auth');
   };
-  document.getElementById('btn-settings').onclick       = openSettings;
-  document.getElementById('btn-banner-settings').onclick = openSettings;
+
+  document.getElementById('btn-open-keys').onclick   = openKeysSheet;
+  document.getElementById('btn-banner-keys').onclick = openKeysSheet;
+  document.getElementById('btn-new-voice').onclick   = openNewVoice;
+
+  // Update heading
+  const voices = getVoices();
+  document.getElementById('dash-heading').textContent =
+    voices.length === 0 ? 'Your voices.' : `${voices.length} voice${voices.length !== 1 ? 's' : ''}.`;
+  document.getElementById('dash-sub').textContent =
+    voices.length === 0
+      ? 'No voices yet — create one to get started.'
+      : `${configured().length} provider${configured().length !== 1 ? 's' : ''} configured · auto-rotated.`;
 
   refreshDashboard();
 }
 
 function refreshDashboard() {
-  renderProviderBadges();
   const voices = getVoices();
   const grid   = document.getElementById('voice-grid');
   grid.innerHTML = '';
   voices.forEach(v => grid.appendChild(buildVoiceCard(v)));
-  grid.appendChild(buildNewCard());
 
-  const banner = document.getElementById('no-keys-banner');
-  banner.classList.toggle('hidden', configured().length > 0);
-}
+  const banner = document.getElementById('dash-key-banner');
+  banner.style.display = configured().length === 0 ? 'flex' : 'none';
 
-function renderProviderBadges() {
-  const wrap = document.getElementById('provider-badges');
-  wrap.innerHTML = '';
-  configured().forEach(p => {
-    const b = document.createElement('span');
-    b.className = 'provider-badge';
-    b.textContent = p.label;
-    wrap.appendChild(b);
-  });
+  // Keys button label
+  const n = configured().length;
+  document.getElementById('keys-btn-label').textContent = n ? `${n} key${n !== 1 ? 's' : ''}` : 'Add keys';
+
+  // Heading
+  document.getElementById('dash-heading').textContent =
+    voices.length === 0 ? 'Your voices.' : `${voices.length} voice${voices.length !== 1 ? 's' : ''}.`;
+  document.getElementById('dash-sub').textContent =
+    voices.length === 0
+      ? 'No voices yet — create one to get started.'
+      : `${n} provider${n !== 1 ? 's' : ''} configured · auto-rotated.`;
 }
 
 function buildVoiceCard(voice) {
-  const srcIcon = {
-    microphone: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>`,
-    upload:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`,
-    youtube:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>`,
-  }[voice.source] || '';
-
   const card = document.createElement('div');
   card.className = 'voice-card';
-  card.innerHTML = `
-    <div class="voice-card-icon">${srcIcon}</div>
-    <div class="voice-card-name">${esc(voice.name)}</div>
-    <div class="voice-card-meta">
-      <span>${fmtDuration(voice.totalDuration)}</span>
-      <span>·</span>
-      <span>${voice.sampleCount} sample${voice.sampleCount !== 1 ? 's' : ''}</span>
-    </div>
-    <div class="voice-card-status ${voice.sampleCount > 0 ? 'ready' : 'pending'}">
-      ${voice.sampleCount > 0 ? 'Ready' : 'No samples yet'}
-    </div>
-    <button class="voice-card-del" title="Delete">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"/>
-        <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/>
-      </svg>
-    </button>
-  `;
 
-  card.querySelector('.voice-card-del').addEventListener('click', async e => {
+  const waveEl = document.createElement('div');
+  waveEl.className = 'voice-card-wave';
+  const seedVal = voice.id.charCodeAt(0) * 31 + voice.id.charCodeAt(1);
+  createStaticWave(waveEl, { bars: 48, height: 44, seed: seedVal });
+  card.appendChild(waveEl);
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'voice-card-name';
+  nameEl.textContent = voice.name;
+  card.appendChild(nameEl);
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'voice-card-meta';
+  metaEl.textContent = `${fmtDuration(voice.totalDuration)} · ${voice.sampleCount} sample${voice.sampleCount !== 1 ? 's' : ''}`;
+  card.appendChild(metaEl);
+
+  const statusEl = document.createElement('div');
+  statusEl.className = `voice-card-status ${voice.sampleCount > 0 ? 'ready' : 'pending'}`;
+  statusEl.textContent = voice.sampleCount > 0 ? '● Ready' : '○ No samples yet';
+  card.appendChild(statusEl);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'voice-card-del';
+  delBtn.title = 'Delete voice';
+  delBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>`;
+  delBtn.addEventListener('click', async e => {
     e.stopPropagation();
     if (!confirm(`Delete "${voice.name}"?`)) return;
-    // Delete from providers
     for (const p of PROVIDERS) {
-      if (voice.providerMaps?.[p.id]) {
-        try { await p.del(voice.providerMaps[p.id]); } catch {}
-      }
+      if (voice.providerMaps?.[p.id]) { try { await p.del(voice.providerMaps[p.id]); } catch {} }
     }
     await dbDeleteByVoice(voice.id);
     removeVoice(voice.id);
     toast('Voice deleted.');
     refreshDashboard();
   });
+  card.appendChild(delBtn);
 
   card.addEventListener('click', e => {
     if (e.target.closest('.voice-card-del')) return;
@@ -532,164 +609,357 @@ function buildVoiceCard(voice) {
   return card;
 }
 
-function buildNewCard() {
-  const card = document.createElement('div');
-  card.className = 'voice-card voice-card-new';
-  card.innerHTML = `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-    <span>New Voice</span>
-  `;
-  card.addEventListener('click', openCreateModal);
-  return card;
-}
+/* ── Keys sheet ─────────────────────────────────────────────────────────── */
+const KEY_DEFS = [
+  { id: 'elevenlabs',   label: 'ElevenLabs',    sub: 'elevenlabs.io — 10,000 chars/mo free',  fields: [{ key: 'elevenlabs', placeholder: 'sk-…' }] },
+  { id: 'playht',       label: 'Play.ht',        sub: 'play.ht — 12,500 words/mo free',        fields: [{ key: 'playht_secret', placeholder: 'Secret key…' }, { key: 'playht_user', placeholder: 'User ID…' }] },
+  { id: 'cartesia',     label: 'Cartesia',       sub: 'cartesia.ai — $5 free credit',          fields: [{ key: 'cartesia', placeholder: 'sk-…' }] },
+  { id: 'lmnt',         label: 'LMNT',           sub: 'lmnt.com — 500 utterances/mo free',     fields: [{ key: 'lmnt', placeholder: 'API key…' }] },
+];
 
-/* ── Settings view ───────────────────────────────────────────────────────────── */
-function openSettings() {
-  // Populate fields from saved keys
-  const k = Keys.all();
-  document.getElementById('key-elevenlabs').value     = k.elevenlabs     || '';
-  document.getElementById('key-playht-secret').value  = k.playht_secret  || '';
-  document.getElementById('key-playht-user').value    = k.playht_user    || '';
-  document.getElementById('key-cartesia').value       = k.cartesia       || '';
-  document.getElementById('key-lmnt').value           = k.lmnt           || '';
-  show('view-settings');
-}
+function openKeysSheet() {
+  const sheet = document.getElementById('keys-sheet');
+  const wrap  = document.getElementById('keys-list-wrap');
+  sheet.classList.remove('hidden');
 
-function initSettings() {
-  document.getElementById('settings-back').onclick = () => {
-    refreshDashboard();
-    show('view-dashboard');
-  };
+  const saved = Keys.all();
+  wrap.innerHTML = '';
 
-  // Show/hide toggles
-  document.querySelectorAll('.btn-reveal').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const inp = document.getElementById(btn.dataset.for);
-      if (!inp) return;
-      inp.type       = inp.type === 'password' ? 'text' : 'password';
-      btn.textContent = inp.type === 'password' ? 'Show' : 'Hide';
+  KEY_DEFS.forEach(def => {
+    const row = document.createElement('div');
+    row.className = 'key-row';
+
+    const allSet = def.fields.every(f => !!saved[f.key]);
+    row.innerHTML = `
+      <div class="key-row-header">
+        <div>
+          <div class="key-row-label">${def.label}</div>
+          <div class="key-row-sub">${def.sub}</div>
+        </div>
+        <div class="key-row-status ${allSet ? 'set' : 'unset'}">${allSet ? 'Set' : 'Not set'}</div>
+      </div>
+    `;
+
+    def.fields.forEach(f => {
+      const wrap2 = document.createElement('div');
+      wrap2.className = 'key-input-wrap';
+      wrap2.style.marginTop = '10px';
+      const inp = document.createElement('input');
+      inp.type = 'password';
+      inp.className = 'input';
+      inp.id = `key-input-${f.key}`;
+      inp.placeholder = f.placeholder;
+      inp.value = saved[f.key] || '';
+      const reveal = document.createElement('button');
+      reveal.className = 'btn-reveal';
+      reveal.textContent = 'Show';
+      reveal.addEventListener('click', () => {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        reveal.textContent = inp.type === 'password' ? 'Show' : 'Hide';
+      });
+      wrap2.appendChild(inp);
+      wrap2.appendChild(reveal);
+      row.appendChild(wrap2);
     });
+
+    wrap.appendChild(row);
   });
 
-  document.getElementById('btn-save-keys').addEventListener('click', () => {
-    Keys.set({
-      elevenlabs:    document.getElementById('key-elevenlabs').value.trim(),
-      playht_secret: document.getElementById('key-playht-secret').value.trim(),
-      playht_user:   document.getElementById('key-playht-user').value.trim(),
-      cartesia:      document.getElementById('key-cartesia').value.trim(),
-      lmnt:          document.getElementById('key-lmnt').value.trim(),
-    });
-    toast('Keys saved.');
-    refreshDashboard();
-    show('view-dashboard');
-  });
+  updateKeysCount();
+  document.getElementById('btn-close-keys').onclick  = closeKeysSheet;
+  document.getElementById('btn-keys-cancel').onclick = closeKeysSheet;
+  document.getElementById('btn-keys-save').onclick   = saveKeys;
+
+  sheet.addEventListener('click', e => {
+    if (e.target === sheet) closeKeysSheet();
+  }, { once: true });
 }
 
-/* ── Create voice modal ─────────────────────────────────────────────────────── */
-let _newSource = 'microphone';
+function closeKeysSheet() {
+  document.getElementById('keys-sheet').classList.add('hidden');
+}
 
-function openCreateModal() {
-  _newSource = 'microphone';
+function saveKeys() {
+  const obj = {};
+  KEY_DEFS.forEach(def => {
+    def.fields.forEach(f => {
+      const val = document.getElementById(`key-input-${f.key}`)?.value.trim() || '';
+      obj[f.key] = val;
+    });
+  });
+  Keys.set(obj);
+  toast('Keys saved.');
+  closeKeysSheet();
+  refreshDashboard();
+}
+
+function updateKeysCount() {
+  const n   = configured().length;
+  const chip = document.getElementById('keys-count-chip');
+  if (chip) chip.textContent = `${n}/4 added`;
+}
+
+/* ── New voice view ─────────────────────────────────────────────────────── */
+let _newSource = 'mic';
+
+function openNewVoice() {
+  _newSource = 'mic';
+  S.newRecBlob = null;
+
   document.getElementById('new-voice-name').value = '';
-  document.getElementById('yt-url').value = '';
-  document.getElementById('create-error').classList.add('hidden');
-  document.getElementById('panel-upload').classList.add('hidden');
-  document.getElementById('panel-youtube').classList.add('hidden');
-  document.querySelectorAll('.source-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.source === 'microphone'));
-  document.getElementById('modal-create').classList.remove('hidden');
-  setTimeout(() => document.getElementById('new-voice-name').focus(), 50);
-}
-function closeCreateModal() {
-  document.getElementById('modal-create').classList.add('hidden');
+  document.getElementById('yt-url').value          = '';
+  document.getElementById('new-error').classList.add('hidden');
+  document.getElementById('btn-new-create').disabled = true;
+  document.getElementById('btn-new-create').style.opacity = '0.4';
+  document.getElementById('new-rec-label').textContent    = 'Tap to record';
+  document.getElementById('new-rec-timer').textContent    = '0:00';
+  document.getElementById('new-rec-dot-row').classList.add('hidden');
+  document.getElementById('new-rec-redo').classList.add('hidden');
+  document.getElementById('new-rec-waveform').innerHTML   = '';
+  document.getElementById('new-rec-btn').classList.remove('recording');
+
+  showNewSrc('mic');
+
+  document.getElementById('btn-new-back').onclick   = () => { stopNewRecording(false); refreshDashboard(); show('view-dashboard'); };
+  document.getElementById('btn-new-cancel').onclick = () => { stopNewRecording(false); refreshDashboard(); show('view-dashboard'); };
+
+  show('view-new');
 }
 
-function initCreateModal() {
-  document.querySelectorAll('.source-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _newSource = btn.dataset.source;
-      document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('panel-upload').classList.toggle('hidden', _newSource !== 'upload');
-      document.getElementById('panel-youtube').classList.toggle('hidden', _newSource !== 'youtube');
+function showNewSrc(src) {
+  _newSource = src;
+  document.querySelectorAll('#new-source-tabs button').forEach(b => {
+    b.classList.toggle('on', b.dataset.src === src);
+  });
+  document.getElementById('new-src-mic').classList.toggle('hidden', src !== 'mic');
+  document.getElementById('new-src-upload').classList.toggle('hidden', src !== 'upload');
+  document.getElementById('new-src-yt').classList.toggle('hidden', src !== 'yt');
+}
+
+function initNewVoice() {
+  document.getElementById('new-source-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-src]');
+    if (btn) showNewSrc(btn.dataset.src);
+  });
+
+  document.getElementById('new-rec-btn').addEventListener('click', () => {
+    if (S.newRecording) stopNewRecording(true);
+    else startNewRecording();
+  });
+
+  document.getElementById('new-rec-redo').addEventListener('click', () => {
+    S.newRecBlob = null;
+    document.getElementById('new-rec-label').textContent = 'Tap to record';
+    document.getElementById('new-rec-timer').textContent = '0:00';
+    document.getElementById('new-rec-redo').classList.add('hidden');
+    document.getElementById('new-rec-waveform').innerHTML = '';
+    document.getElementById('new-rec-btn').classList.remove('recording');
+    document.getElementById('btn-new-create').disabled = true;
+    document.getElementById('btn-new-create').style.opacity = '0.4';
+  });
+
+  // Drag-and-drop on upload panel
+  const drop = document.getElementById('new-src-upload');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleUploadFile(file);
+  });
+  document.getElementById('upload-file-input').addEventListener('change', e => {
+    if (e.target.files[0]) handleUploadFile(e.target.files[0]);
+  });
+
+  // Name input enables button
+  document.getElementById('new-voice-name').addEventListener('input', checkNewReady);
+
+  document.getElementById('btn-new-create').addEventListener('click', confirmNewVoice);
+}
+
+function checkNewReady() {
+  const name  = document.getElementById('new-voice-name').value.trim();
+  const ready = name.length > 0 && (
+    (_newSource === 'mic'    && !!S.newRecBlob) ||
+    (_newSource === 'upload' && !!document.getElementById('upload-file-input').files[0]) ||
+    (_newSource === 'yt'     && document.getElementById('yt-url').value.trim().length > 0)
+  );
+  document.getElementById('btn-new-create').disabled       = !ready;
+  document.getElementById('btn-new-create').style.opacity  = ready ? '1' : '0.4';
+}
+
+function handleUploadFile(file) {
+  const label = document.getElementById('upload-label');
+  const sub   = document.getElementById('upload-sub');
+  label.textContent = file.name;
+  sub.textContent   = `${(file.size / 1024 / 1024).toFixed(1)} MB · ${file.type || 'audio'}`;
+  checkNewReady();
+}
+
+async function startNewRecording() {
+  try {
+    S.newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch {
+    toast('Microphone access denied.');
+    return;
+  }
+
+  S.newChunks  = [];
+  S.newRecording = true;
+  S.newRecSecs   = 0;
+
+  document.getElementById('new-rec-btn').classList.add('recording');
+  document.getElementById('new-rec-label').textContent = 'Recording — tap to stop';
+  document.getElementById('new-rec-dot-row').classList.remove('hidden');
+
+  // Timer
+  S.newRecTimer = setInterval(() => {
+    S.newRecSecs++;
+    const m = Math.floor(S.newRecSecs / 60), s = S.newRecSecs % 60;
+    document.getElementById('new-rec-timer').textContent = `${m}:${String(s).padStart(2, '0')}`;
+  }, 1000);
+
+  // Waveform
+  if (!S.audioCtx) {
+    S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    S.analyser  = S.audioCtx.createAnalyser();
+    S.analyser.fftSize = 256;
+  }
+  S.audioCtx.createMediaStreamSource(S.newStream).connect(S.analyser);
+  drawNewWaveform();
+
+  const mime = bestMime();
+  S.newMediaRec = new MediaRecorder(S.newStream, mime ? { mimeType: mime } : {});
+  S.newMediaRec.ondataavailable = e => { if (e.data.size > 0) S.newChunks.push(e.data); };
+  S.newMediaRec.onstop = finishNewRecording;
+  S.newMediaRec.start();
+}
+
+function stopNewRecording(andFinish) {
+  if (!S.newRecording) return;
+  S.newRecording = false;
+  clearInterval(S.newRecTimer);
+  stopWaveform();
+  if (!andFinish && S.newMediaRec) S.newMediaRec.onstop = null;
+  if (S.newMediaRec?.state !== 'inactive') S.newMediaRec?.stop();
+  if (S.newStream) { S.newStream.getTracks().forEach(t => t.stop()); S.newStream = null; }
+  document.getElementById('new-rec-btn').classList.remove('recording');
+  document.getElementById('new-rec-dot-row').classList.add('hidden');
+}
+
+function finishNewRecording() {
+  const mime = S.newChunks[0]?.type || 'audio/webm';
+  const blob = new Blob(S.newChunks, { type: mime });
+  if (blob.size < 500) { toast('Recording too short — try again.'); return; }
+  S.newRecBlob = blob;
+  document.getElementById('new-rec-label').textContent = 'Recording saved ✓';
+  document.getElementById('new-rec-redo').classList.remove('hidden');
+
+  // Show static waveform
+  const wfEl = document.getElementById('new-rec-waveform');
+  wfEl.innerHTML = '';
+  wfEl.style.color = 'var(--accent)';
+  createStaticWave(wfEl, { bars: 48, height: 48, seed: Date.now() % 9999 });
+  checkNewReady();
+}
+
+function drawNewWaveform() {
+  const el = document.getElementById('new-rec-waveform');
+  if (!el) return;
+  el.innerHTML = '';
+  el.style.cssText = 'display:flex;align-items:center;gap:2px;height:48px;color:var(--accent);width:100%;max-width:420px';
+
+  const barCount = 48;
+  const bars = [];
+  for (let i = 0; i < barCount; i++) {
+    const b = document.createElement('span');
+    b.style.cssText = 'flex:1;background:currentColor;border-radius:1px;height:4px;transform-origin:center;transition:height 0.05s';
+    el.appendChild(b);
+    bars.push(b);
+  }
+
+  const frame = () => {
+    if (!S.newRecording && !S.isRecording) return;
+    S.animFrame = requestAnimationFrame(frame);
+    if (!S.analyser) return;
+    const data = new Uint8Array(S.analyser.frequencyBinCount);
+    S.analyser.getByteFrequencyData(data);
+    const step = Math.floor(data.length / barCount);
+    bars.forEach((b, i) => {
+      const v = data[i * step] / 255;
+      b.style.height = `${Math.max(4, v * 100)}%`;
+      b.style.opacity = String(0.4 + v * 0.6);
     });
-  });
+  };
+  stopWaveform();
+  frame();
+}
 
-  document.getElementById('btn-create-cancel').addEventListener('click', closeCreateModal);
-  document.getElementById('modal-create').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal-create')) closeCreateModal();
-  });
+async function confirmNewVoice() {
+  const name  = document.getElementById('new-voice-name').value.trim();
+  const errEl = document.getElementById('new-error');
+  errEl.classList.add('hidden');
+  if (!name) { errEl.textContent = 'Please give your voice a name.'; errEl.classList.remove('hidden'); return; }
 
-  document.getElementById('btn-create-confirm').addEventListener('click', async () => {
-    const name  = document.getElementById('new-voice-name').value.trim();
-    const errEl = document.getElementById('create-error');
-    errEl.classList.add('hidden');
-    if (!name) { errEl.textContent = 'Please give your voice a name.'; errEl.classList.remove('hidden'); return; }
+  const btn = document.getElementById('btn-new-create');
+  btn.disabled = true;
 
-    const btn = document.getElementById('btn-create-confirm');
-    btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const voice = makeVoice(name, _newSource === 'yt' ? 'youtube' : _newSource);
 
-    try {
-      const voice = makeVoice(name, _newSource);
-
-      if (_newSource === 'upload') {
-        const file = document.getElementById('upload-file-input').files[0];
-        if (file) {
-          const buf = await file.arrayBuffer();
-          await dbPut({ id: uuid(), voiceId: voice.id, data: buf, mime: file.type, name: file.name, createdAt: Date.now() });
-          voice.sampleCount   = 1;
-          voice.totalDuration = estimateDuration(file.size, file.type);
-        }
-        saveVoice(voice);
-        closeCreateModal();
-        refreshDashboard();
-        openSpeak(voice);
-        return;
-      }
-
-      if (_newSource === 'youtube') {
-        const url = document.getElementById('yt-url').value.trim();
-        if (url) {
-          btn.textContent = 'Downloading…';
-          try {
-            const blob = await downloadYouTube(url);
-            const buf  = await blob.arrayBuffer();
-            await dbPut({ id: uuid(), voiceId: voice.id, data: buf, mime: blob.type || 'audio/mpeg', name: 'youtube.mp3', createdAt: Date.now() });
-            voice.sampleCount   = 1;
-            voice.totalDuration = estimateDuration(blob.size, blob.type);
-            voice.source        = 'youtube';
-          } catch (e) {
-            errEl.textContent = e.message;
-            errEl.classList.remove('hidden');
-            btn.disabled = false; btn.textContent = 'Create & Train';
-            return;
-          }
-        }
-        saveVoice(voice);
-        closeCreateModal();
-        refreshDashboard();
-        if (voice.sampleCount > 0) openSpeak(voice);
-        else openTrain(voice, 'initial');
-        return;
-      }
-
+    if (_newSource === 'mic') {
+      if (!S.newRecBlob) { errEl.textContent = 'Please record audio first.'; errEl.classList.remove('hidden'); return; }
+      const buf = await S.newRecBlob.arrayBuffer();
+      await dbPut({ id: uuid(), voiceId: voice.id, data: buf, mime: S.newRecBlob.type || 'audio/webm', name: `rec_${Date.now()}.webm`, createdAt: Date.now() });
+      voice.sampleCount   = 1;
+      voice.totalDuration = estimateDuration(S.newRecBlob.size, S.newRecBlob.type);
       saveVoice(voice);
-      closeCreateModal();
       refreshDashboard();
       openTrain(voice, 'initial');
-    } catch (e) {
-      errEl.textContent = e.message;
-      errEl.classList.remove('hidden');
-    } finally {
-      btn.disabled = false; btn.textContent = 'Create & Train';
+      return;
     }
-  });
+
+    if (_newSource === 'upload') {
+      const file = document.getElementById('upload-file-input').files[0];
+      if (file) {
+        const buf = await file.arrayBuffer();
+        await dbPut({ id: uuid(), voiceId: voice.id, data: buf, mime: file.type, name: file.name, createdAt: Date.now() });
+        voice.sampleCount   = 1;
+        voice.totalDuration = estimateDuration(file.size, file.type);
+      }
+      saveVoice(voice);
+      refreshDashboard();
+      openSpeak(voice);
+      return;
+    }
+
+    if (_newSource === 'yt') {
+      const url = document.getElementById('yt-url').value.trim();
+      btn.textContent = 'Downloading…';
+      try {
+        const blob = await downloadYouTube(url);
+        const buf  = await blob.arrayBuffer();
+        await dbPut({ id: uuid(), voiceId: voice.id, data: buf, mime: blob.type || 'audio/mpeg', name: 'youtube.mp3', createdAt: Date.now() });
+        voice.sampleCount   = 1;
+        voice.totalDuration = estimateDuration(blob.size, blob.type);
+      } catch (e) {
+        errEl.textContent = e.message; errEl.classList.remove('hidden');
+        btn.disabled = false; btn.innerHTML = 'Create &amp; train <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
+        return;
+      }
+      saveVoice(voice);
+      refreshDashboard();
+      if (voice.sampleCount > 0) openSpeak(voice);
+      else openTrain(voice, 'initial');
+    }
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+  }
 }
 
 async function downloadYouTube(url) {
-  // cobalt.tools is a free, CORS-enabled media download API
   const r = await fetch('https://api.cobalt.tools/api/json', {
     method: 'POST',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
@@ -699,7 +969,6 @@ async function downloadYouTube(url) {
   const d = await r.json();
   if (d.status === 'error' || d.status === 'rate-limit')
     throw new Error(d.text || 'YouTube download failed. Try uploading the audio file directly.');
-
   const audioR = await fetch(d.url).catch(() => null);
   if (!audioR?.ok)
     throw new Error('Could not fetch YouTube audio (CORS). Download the audio manually and use Upload instead.');
@@ -711,105 +980,79 @@ function estimateDuration(size, mime) {
   return size / bps;
 }
 
-/* ── Train view ──────────────────────────────────────────────────────────────── */
+/* ── Train view ─────────────────────────────────────────────────────────── */
 function openTrain(voice, mode) {
   S.voice     = voice;
   S.trainMode = mode;
-
-  document.getElementById('train-voice-name').textContent = voice.name;
-  document.getElementById('train-mode-label').textContent =
-    mode === 'initial' ? 'Quick Training' : 'Extended Training';
-  document.getElementById('btn-train-done').classList.toggle('hidden', mode === 'initial');
-
-  document.getElementById('train-intro').classList.remove('hidden');
-  document.getElementById('train-session').classList.add('hidden');
-  document.getElementById('train-complete').classList.add('hidden');
-
-  show('view-train');
-
-  document.getElementById('train-back').onclick = () => {
-    stopRecording(false);
-    refreshDashboard();
-    show('view-dashboard');
-  };
-  document.getElementById('btn-train-done').onclick = () => {
-    stopRecording(false);
-    finishTraining();
-  };
-  document.getElementById('btn-start-train').onclick = startTrainSession;
-}
-
-function startTrainSession() {
-  S.sentences   = S.trainMode === 'initial'
-    ? [...INITIAL_SENTENCES]
-    : shuffle([...EXTENDED_SENTENCES]);
+  S.sentences   = mode === 'initial' ? [...INITIAL_SENTENCES] : shuffle([...EXTENDED_SENTENCES]);
   S.sentenceIdx = 0;
 
-  document.getElementById('train-intro').classList.add('hidden');
-  document.getElementById('train-session').classList.remove('hidden');
-  document.getElementById('train-complete').classList.add('hidden');
+  const isImproving = mode === 'extended';
+  document.getElementById('train-step-eyebrow').textContent = isImproving ? 'IMPROVING · REFINE' : 'STEP 2 OF 3 · REFINE';
+  document.getElementById('btn-train-done').textContent = isImproving ? 'Done improving' : 'Skip training';
+
+  document.getElementById('train-chip').textContent = voice.name;
+  document.getElementById('train-counter').textContent =
+    mode === 'initial' ? `0 of ${S.sentences.length} prompts` : 'Extended training · press Done when finished';
 
   showSentence();
-  initWaveform();
+  initTrainWaveform();
+
+  document.getElementById('btn-train-done').onclick = () => {
+    stopRecording(false);
+    if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
+    if (mode === 'initial') { refreshDashboard(); show('view-dashboard'); }
+    else openSpeak(getVoice(S.voice.id) || S.voice);
+  };
 
   document.getElementById('btn-skip').onclick = () => {
     stopRecording(false);
     nextSentence();
   };
+
   document.getElementById('btn-record').onclick = () => {
     if (S.isRecording) stopRecording(true);
     else startRecording();
   };
+
+  document.getElementById('btn-next-sentence').onclick = () => {
+    if (S.isRecording) stopRecording(true);
+    else nextSentence();
+  };
+
+  show('view-train');
 }
 
 function showSentence() {
   const total = S.trainMode === 'initial' ? S.sentences.length : null;
   const idx   = S.sentenceIdx;
 
-  document.getElementById('train-sentence').textContent = S.sentences[idx] || '';
-  document.getElementById('train-counter').textContent  =
-    total !== null ? `Sentence ${idx + 1} of ${total}` : `Sample ${idx + 1}`;
-  document.getElementById('train-progress').style.width =
-    total !== null ? `${(idx / total) * 100}%` : '100%';
+  document.getElementById('train-sentence').textContent  = S.sentences[idx] || '';
+  document.getElementById('train-prompt-num').textContent = `PROMPT ${String(idx + 1).padStart(2, '0')}`;
+  document.getElementById('train-counter').textContent   =
+    total !== null ? `${idx + 1} of ${total} prompts` : `Sample ${idx + 1}`;
 
-  updateQualityBadge();
-
-  const btn   = document.getElementById('btn-record');
-  const label = document.getElementById('record-label');
-  btn.classList.remove('recording');
-  label.textContent = 'Press to record';
-}
-
-function updateQualityBadge() {
-  const dur = S.voice?.totalDuration || 0;
-  const el  = document.getElementById('train-quality');
-  if (dur === 0)    { el.className = 'quality-badge q0'; el.textContent = ''; }
-  else if (dur < 30){ el.className = 'quality-badge q1'; el.textContent = 'Getting started'; }
-  else if (dur < 120){ el.className = 'quality-badge q2'; el.textContent = 'Good quality'; }
-  else if (dur < 300){ el.className = 'quality-badge q2'; el.textContent = 'Great quality'; }
-  else               { el.className = 'quality-badge q3'; el.textContent = 'Excellent quality'; }
+  document.getElementById('btn-record').classList.remove('recording');
+  document.getElementById('rec-state-label').textContent = 'Start recording';
+  document.getElementById('btn-next-sentence').disabled  = true;
+  document.getElementById('btn-next-sentence').style.opacity = '0.4';
 }
 
 function nextSentence() {
   S.sentenceIdx++;
-  if (S.trainMode === 'initial' && S.sentenceIdx >= S.sentences.length) { finishTraining(); return; }
+  if (S.trainMode === 'initial' && S.sentenceIdx >= S.sentences.length) {
+    // Training complete — go to speak
+    stopWaveform();
+    if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
+    toast(`Training complete! ${S.voice.sampleCount} samples recorded.`);
+    openSpeak(getVoice(S.voice.id) || S.voice);
+    return;
+  }
   if (S.sentenceIdx >= S.sentences.length) {
     S.sentences   = shuffle([...EXTENDED_SENTENCES]);
     S.sentenceIdx = 0;
   }
   showSentence();
-}
-
-function finishTraining() {
-  stopWaveform();
-  if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
-  document.getElementById('train-session').classList.add('hidden');
-  document.getElementById('train-complete').classList.remove('hidden');
-  document.getElementById('train-complete-sub').textContent =
-    `${fmtDuration(S.voice?.totalDuration || 0)} collected across ${S.voice?.sampleCount || 0} samples.`;
-  document.getElementById('btn-go-speak').onclick          = () => openSpeak(getVoice(S.voice.id) || S.voice);
-  document.getElementById('btn-continue-from-complete').onclick = () =>
-    openTrain(getVoice(S.voice.id) || S.voice, 'extended');
 }
 
 function shuffle(arr) {
@@ -820,7 +1063,7 @@ function shuffle(arr) {
   return arr;
 }
 
-/* ── Audio recording ─────────────────────────────────────────────────────────── */
+/* ── Audio recording ────────────────────────────────────────────────────── */
 function bestMime() {
   for (const t of ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'])
     if (MediaRecorder.isTypeSupported(t)) return t;
@@ -841,10 +1084,10 @@ async function startRecording() {
   if (!S.audioCtx) {
     S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     S.analyser  = S.audioCtx.createAnalyser();
-    S.analyser.fftSize = 512;
+    S.analyser.fftSize = 256;
   }
   S.audioCtx.createMediaStreamSource(S.stream).connect(S.analyser);
-  drawWaveform();
+  drawTrainWaveform();
 
   const mime = bestMime();
   S.mediaRecorder = new MediaRecorder(S.stream, mime ? { mimeType: mime } : {});
@@ -853,7 +1096,7 @@ async function startRecording() {
   S.mediaRecorder.start();
 
   document.getElementById('btn-record').classList.add('recording');
-  document.getElementById('record-label').textContent = 'Recording — press to stop';
+  document.getElementById('rec-state-label').textContent = 'Recording — tap to stop';
 }
 
 function stopRecording(andSubmit) {
@@ -863,6 +1106,8 @@ function stopRecording(andSubmit) {
   if (S.mediaRecorder?.state !== 'inactive') S.mediaRecorder?.stop();
   if (S.stream) { S.stream.getTracks().forEach(t => t.stop()); S.stream = null; }
   stopWaveform();
+  document.getElementById('btn-record').classList.remove('recording');
+  document.getElementById('rec-state-label').textContent = 'Start recording';
 }
 
 async function submitRecording() {
@@ -877,54 +1122,51 @@ async function submitRecording() {
     const buf = await blob.arrayBuffer();
     await dbPut({ id: uuid(), voiceId: S.voice.id, data: buf, mime, name: `rec_${Date.now()}.webm`, createdAt: Date.now() });
     S.voice.sampleCount++;
-    S.voice.totalDuration += blob.size / 16000; // rough estimate
+    S.voice.totalDuration += blob.size / 16000;
     saveVoice(S.voice);
-    nextSentence();
+    document.getElementById('btn-next-sentence').disabled = false;
+    document.getElementById('btn-next-sentence').style.opacity = '1';
+    document.getElementById('rec-state-label').textContent = 'Recorded ✓ — next sentence or re-record';
   } catch (e) {
     toast(`Save error: ${e.message}`);
     showSentence();
   } finally {
     btn.disabled = false;
-    document.getElementById('btn-record').classList.remove('recording');
-    document.getElementById('record-label').textContent = 'Press to record';
   }
 }
 
-/* ── Waveform ────────────────────────────────────────────────────────────────── */
-function initWaveform() {
-  const c = document.getElementById('waveform-canvas');
-  c.getContext('2d').clearRect(0, 0, c.width, c.height);
+/* ── Waveforms ──────────────────────────────────────────────────────────── */
+function initTrainWaveform() {
+  const el = document.getElementById('train-waveform');
+  if (el) createAnimatedWaveform(el, { bars: 18, height: 36, gap: 3, width: 3, seed: 7, animated: false });
 }
 
-function drawWaveform() {
-  const canvas = document.getElementById('waveform-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+function drawTrainWaveform() {
+  const el = document.getElementById('train-waveform');
+  if (!el) return;
+  el.innerHTML = '';
+  el.style.cssText = 'display:flex;align-items:center;gap:3px;height:36px;width:140px;color:var(--accent)';
+
+  const barCount = 18;
+  const bars = [];
+  for (let i = 0; i < barCount; i++) {
+    const b = document.createElement('span');
+    b.style.cssText = 'width:3px;background:currentColor;border-radius:2px;height:4px;transform-origin:center;transition:height 0.06s';
+    el.appendChild(b); bars.push(b);
+  }
 
   const frame = () => {
+    if (!S.isRecording) return;
     S.animFrame = requestAnimationFrame(frame);
-    ctx.fillStyle = '#101010';
-    ctx.fillRect(0, 0, W, H);
-
-    if (!S.analyser) {
-      ctx.strokeStyle = '#252525'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke();
-      return;
-    }
-
-    const buf = new Uint8Array(S.analyser.frequencyBinCount);
-    S.analyser.getByteTimeDomainData(buf);
-    ctx.strokeStyle = S.isRecording ? '#ff4d4d' : '#333333';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    const sw = W / buf.length;
-    buf.forEach((v, i) => {
-      const y = ((v / 128) * H) / 2;
-      i === 0 ? ctx.moveTo(0, y) : ctx.lineTo(i * sw, y);
+    if (!S.analyser) return;
+    const data = new Uint8Array(S.analyser.frequencyBinCount);
+    S.analyser.getByteFrequencyData(data);
+    const step = Math.floor(data.length / barCount);
+    bars.forEach((b, i) => {
+      const v = data[i * step] / 255;
+      b.style.height = `${Math.max(4, v * 100)}%`;
     });
-    ctx.lineTo(W, H / 2); ctx.stroke();
   };
-
   stopWaveform();
   frame();
 }
@@ -933,23 +1175,24 @@ function stopWaveform() {
   if (S.animFrame) { cancelAnimationFrame(S.animFrame); S.animFrame = null; }
 }
 
-/* ── Speak view ──────────────────────────────────────────────────────────────── */
+/* ── Speak view ─────────────────────────────────────────────────────────── */
 function openSpeak(voice) {
   S.voice        = voice;
   S.generatedURL = null;
 
-  document.getElementById('speak-voice-name').textContent  = voice.name;
-  document.getElementById('speak-voice-stats').textContent =
-    `${fmtDuration(voice.totalDuration)} · ${voice.sampleCount} sample${voice.sampleCount !== 1 ? 's' : ''}`;
-  document.getElementById('speak-text').value = '';
-  document.getElementById('char-count').textContent = '0 / 1500';
-  document.getElementById('audio-section').classList.add('hidden');
+  document.getElementById('speak-voice-name').textContent = voice.name;
+  document.getElementById('speak-provider-info').textContent =
+    `${voice.sampleCount} sample${voice.sampleCount !== 1 ? 's' : ''} · ${fmtDuration(voice.totalDuration)}`;
+  document.getElementById('speak-text').value              = '';
+  document.getElementById('char-count').textContent        = '0 / 1500';
+  document.getElementById('audio-card').classList.add('hidden');
   document.getElementById('speak-error').classList.add('hidden');
+  document.getElementById('audio-player-wrap').classList.add('hidden');
 
   show('view-speak');
 
   document.getElementById('speak-back').onclick = () => { refreshDashboard(); show('view-dashboard'); };
-  document.getElementById('btn-continue-training').onclick = () =>
+  document.getElementById('btn-keep-improving').onclick = () =>
     openTrain(getVoice(voice.id) || voice, 'extended');
 
   const ta = document.getElementById('speak-text');
@@ -964,24 +1207,26 @@ async function generateSpeech() {
   errEl.classList.add('hidden');
   if (!text) { errEl.textContent = 'Please enter some text first.'; errEl.classList.remove('hidden'); return; }
   if (!configured().length) {
-    errEl.textContent = 'No API keys configured. Open Settings (⚙ in the top bar) to add keys.';
+    errEl.textContent = 'No API keys configured. Click "Add keys" in the top bar.';
     errEl.classList.remove('hidden'); return;
   }
 
   const btn     = document.getElementById('btn-generate');
   const label   = document.getElementById('generate-label');
   const spinner = document.getElementById('generate-spinner');
+  const icon    = document.getElementById('generate-icon');
   btn.disabled  = true;
   spinner.classList.remove('hidden');
-  document.getElementById('audio-section').classList.add('hidden');
+  icon.classList.add('hidden');
+  document.getElementById('audio-card').classList.add('hidden');
 
   try {
-    label.textContent = 'Preparing voice…';
+    label.textContent = 'Uploading voice…';
     const freshVoice = getVoice(S.voice.id) || S.voice;
     await ensureOnProviders(freshVoice);
     S.voice = getVoice(S.voice.id) || freshVoice;
 
-    label.textContent = 'Generating speech…';
+    label.textContent = 'Generating…';
     const blob = await synthesizeRotated(S.voice, text);
 
     if (S.generatedURL) URL.revokeObjectURL(S.generatedURL);
@@ -991,8 +1236,34 @@ async function generateSpeech() {
     const player = document.getElementById('audio-player');
     player.src   = S.generatedURL;
     player.load();
-    document.getElementById('audio-section').classList.remove('hidden');
+
+    // Show card with static waveform
+    document.getElementById('audio-card').classList.remove('hidden');
+    document.getElementById('audio-player-wrap').classList.remove('hidden');
+    document.getElementById('audio-meta').textContent = `via ${configured()[_synthIdx % Math.max(1, configured().length) - 1]?.label || 'provider'} · rotated`;
+
+    const pwEl = document.getElementById('player-wave');
+    pwEl.innerHTML = '';
+    createStaticWave(pwEl, { bars: 60, height: 36, seed: Date.now() % 9999 });
+
+    const wfWrap = document.getElementById('audio-waveform-wrap');
+    wfWrap.innerHTML = '';
+    createStaticWave(wfWrap, { bars: 80, height: 64, seed: (Date.now() + 1) % 9999 });
+
     player.play().catch(() => {});
+
+    // Play button
+    const playBtn = document.getElementById('play-btn');
+    playBtn.onclick = () => {
+      if (player.paused) player.play();
+      else player.pause();
+    };
+    player.onplay  = () => { playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`; };
+    player.onpause = () => { playBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`; };
+    player.ontimeupdate = () => {
+      const t = player.currentTime, m = Math.floor(t / 60), s = Math.floor(t % 60);
+      document.getElementById('player-time').textContent = `${m}:${String(s).padStart(2, '0')}`;
+    };
 
     document.getElementById('btn-download').onclick = () => {
       const ext = S.generatedMime.includes('mpeg') ? 'mp3' : 'wav';
@@ -1000,21 +1271,24 @@ async function generateSpeech() {
       a.href = S.generatedURL; a.download = `${S.voice.name.replace(/\s+/g,'_')}_speech.${ext}`;
       a.click();
     };
+
+    document.getElementById('audio-cost').textContent = `${text.length} characters`;
+
   } catch (e) {
     errEl.textContent = e.message;
     errEl.classList.remove('hidden');
   } finally {
     btn.disabled = false;
-    label.textContent = 'Generate Speech';
+    label.textContent = 'Generate speech';
     spinner.classList.add('hidden');
+    icon.classList.remove('hidden');
   }
 }
 
-/* ── Boot ────────────────────────────────────────────────────────────────────── */
+/* ── Boot ───────────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   initAuth();
-  initSettings();
-  initCreateModal();
+  initNewVoice();
 
   const userId = LS('session', null);
   if (userId) {
