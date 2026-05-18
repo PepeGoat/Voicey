@@ -1506,148 +1506,142 @@ async function generateSpeech() {
 }
 
 /* ── Tour ───────────────────────────────────────────────────────────────── */
-function _tourSetupTrain() {
-  show('view-train');
-  document.getElementById('train-sentence').textContent   =
-    'The copper teapot caught the early light, casting long amber shadows across the kitchen floor.';
-  document.getElementById('train-prompt-num').textContent = 'PROMPT 01';
-  document.getElementById('train-counter').textContent    = '1 of 10 prompts';
-  document.getElementById('rec-state-label').textContent  = 'Start recording';
-  const rb = document.getElementById('btn-record');
-  if (rb) rb.classList.remove('recording');
-}
-
-function _tourSetupSpeak() {
-  show('view-speak');
-  document.getElementById('speak-voice-name').textContent    = S.user ? `${S.user.username}'s Voice` : 'My Voice';
-  document.getElementById('speak-provider-info').textContent = '10 samples · 2:34';
-  document.getElementById('speak-text').value                = '';
-  document.getElementById('char-count').textContent          = '0 / 1500';
-  document.getElementById('audio-card').classList.add('hidden');
-  document.getElementById('speak-error').classList.add('hidden');
-  document.getElementById('audio-player-wrap').classList.add('hidden');
-}
-
 const TOUR_STEPS = [
   {
     view:    'view-dashboard',
     target:  null,
-    eyebrow: 'QUICK TOUR · 15 STEPS',
+    eyebrow: 'QUICK TOUR · 14 STEPS',
     title:   'Welcome to Voicey.',
-    body:    'Clone any voice in minutes — record yourself, upload audio, or paste a YouTube link. Then type anything and hear it back in that voice. Let\'s walk through every part of the app.',
+    body:    "Clone any voice and generate speech from text — entirely in your browser. Let's walk through every screen and create a demo voice along the way.",
   },
   {
     view:    'view-dashboard',
     target:  '#btn-open-keys',
     pad:     10,
     eyebrow: 'STEP 1 · API KEYS',
-    title:   'Start with a free API key.',
-    body:    'Voicey runs entirely in your browser and uses ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis — all have generous free tiers, no credit card required. Add as many as you like and Voicey rotates between them automatically.',
+    title:   'You need one free API key.',
+    body:    "Voicey calls ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis. All four are completely free to start — no credit card. We'll open the key setup when this tour ends.",
   },
   {
     view:    'view-dashboard',
     target:  '#btn-new-voice',
     pad:     10,
     eyebrow: 'STEP 2 · CREATE',
-    title:   'Create your first voice.',
-    body:    'Click "New voice" to begin cloning. You can record on your microphone, upload an audio file, or paste a YouTube URL. Give the voice a name and Voicey handles the rest.',
-  },
-  {
-    view:    'view-dashboard',
-    target:  '#voice-grid',
-    pad:     16,
-    eyebrow: 'STEP 3 · LIBRARY',
-    title:   'Your voice library.',
-    body:    'Every cloned voice lives here as a card. Tap any card to open the speak view. Hit "Keep improving" on a voice to add more training samples and increase accuracy over time.',
-  },
-  {
-    view:    'view-dashboard',
-    target:  '#dash-recipe',
-    pad:     16,
-    eyebrow: 'STEP 4 · THE PROCESS',
-    title:   'Three steps. Every time.',
-    body:    'Capture clean audio. Refine by reading short prompts aloud. Speak anything. The more samples you record in training, the more accurate the clone becomes — you control when it\'s good enough.',
-  },
-  {
-    view:         'view-dashboard',
-    target:       '#usage-widget',
-    pad:          10,
-    eyebrow:      'STEP 5 · USAGE',
-    title:        'Free tier tracker.',
-    body:         'This widget estimates how much of each provider\'s free quota you\'ve used. Bars turn yellow at 60 % and red at 90 %. Hit Reset at the start of each month to keep the counts accurate.',
-    skipIfHidden: true,
+    title:   'This button creates a voice.',
+    body:    "Tap \"New voice\" to start. Click Next and we'll open the creation screen right now.",
   },
   {
     view:    'view-new',
-    setup:   () => openNewVoice(),
+    setup() {
+      try {
+        openNewVoice();
+        const n = document.getElementById('new-voice-name');
+        if (n) { n.value = 'Demo Voice'; }
+      } catch(e) {}
+    },
     target:  null,
-    eyebrow: 'STEP 6 · NEW VOICE',
+    eyebrow: 'STEP 3 · NEW VOICE SCREEN',
     title:   'Creating a new voice.',
-    body:    'This is the New Voice screen. Give your voice a memorable name, then pick how to capture audio: record directly with your mic, upload a file, or pull audio from a YouTube video.',
+    body:    "Name the voice, then choose how to get the audio: record your mic right here, upload a file, or paste a YouTube URL. We've typed 'Demo Voice' as the name.",
   },
   {
     view:    'view-new',
     target:  '#new-voice-name',
     pad:     10,
-    eyebrow: 'STEP 7 · NAME',
-    title:   'Name your voice.',
-    body:    'Type a descriptive name here — "My Voice", "Interview Mic", or whoever you\'re cloning. It appears on the library card. Choose carefully; you can\'t rename it later.',
+    eyebrow: 'STEP 4 · NAME',
+    title:   'Give it a descriptive name.',
+    body:    "The name appears on the library card. You can call it anything — your name, a colleague's, a character. It can't be changed later so choose carefully.",
   },
   {
     view:    'view-new',
     target:  '#new-source-tabs',
     pad:     8,
-    eyebrow: 'STEP 8 · SOURCE',
+    eyebrow: 'STEP 5 · AUDIO SOURCE',
     title:   'Three ways to capture audio.',
-    body:    '<b>Mic</b> — record live in the browser. Best for cloning your own voice. <b>Upload</b> — drag or pick an MP3 or WAV up to 50 MB. <b>YouTube</b> — paste any public video URL; Voicey extracts the audio automatically.',
+    body:    '<b>Mic</b> — record live in the browser, great for your own voice. <b>Upload</b> — drag an MP3 or WAV up to 50 MB. <b>YouTube</b> — paste any public video URL; Voicey extracts the audio automatically.',
   },
   {
     view:    'view-new',
     target:  '#new-rec-btn',
     pad:     14,
-    eyebrow: 'STEP 9 · RECORD',
-    title:   'Tap to start recording.',
-    body:    'Press this button to capture audio from your microphone. A waveform appears as you speak. Aim for 60–90 seconds of natural speech. Press again to stop, or hit Redo to start over.',
+    eyebrow: 'STEP 6 · RECORD',
+    title:   'Press to start recording.',
+    body:    "Tap this button and speak naturally for 60–90 seconds. A live waveform shows while you record. Press again to stop. Hit Redo if you want to try again.",
+  },
+  {
+    view:    'view-dashboard',
+    setup() {
+      try {
+        if (!Tour._demo) {
+          const d = makeVoice('Demo Voice', 'mic');
+          d.sampleCount   = 6;
+          d.totalDuration = 54;
+          saveVoice(d);
+          Tour._demo = d;
+        }
+        refreshDashboard();
+      } catch(e) {}
+    },
+    target:  null,
+    eyebrow: 'STEP 7 · LIBRARY',
+    title:   "Voice saved — it's in your library.",
+    body:    "After creation the voice appears as a card. We've added a demo voice so you can see how it looks. Tap any card to open the Speak view for that voice.",
+  },
+  {
+    view:    'view-dashboard',
+    target:  '#voice-grid',
+    pad:     14,
+    eyebrow: 'STEP 8 · VOICE CARDS',
+    title:   'Tap a card to speak.',
+    body:    "Each card shows the name, sample count, and total recording time. Tap it to go to the Speak view. Use 'Keep improving' on the speak screen to record more training samples.",
   },
   {
     view:    'view-train',
-    setup:   () => _tourSetupTrain(),
+    setup() {
+      try {
+        if (Tour._demo) openTrain(Tour._demo, 'initial');
+      } catch(e) {}
+    },
     target:  null,
-    eyebrow: 'STEP 10 · TRAINING',
-    title:   'Refine with prompts.',
-    body:    'The Training view presents short sentences to read aloud. Each recording is saved as a training sample. The more prompts you record, the more naturally the AI reproduces your voice\'s nuances.',
+    eyebrow: 'STEP 9 · TRAINING',
+    title:   'Refine with short prompts.',
+    body:    "Training gives you one sentence at a time to read aloud. Every recording improves how accurately the AI captures your voice. The more prompts you do, the more natural the output.",
   },
   {
     view:    'view-train',
     target:  '#btn-record',
     pad:     14,
-    eyebrow: 'STEP 11 · RECORD PROMPT',
-    title:   'Read the prompt. Press record.',
-    body:    'Read the sentence shown above out loud, then press this button to capture it. After recording, press "Next prompt" to continue. Press "Done for now" at any time to return to your library.',
+    eyebrow: 'STEP 10 · RECORD PROMPT',
+    title:   'Read the sentence. Press record.',
+    body:    "Read the sentence shown above, press this button to capture it, then press 'Next prompt' to continue. Press 'Skip training' or 'Done for now' at any time to return to the library.",
   },
   {
     view:    'view-speak',
-    setup:   () => _tourSetupSpeak(),
+    setup() {
+      try {
+        if (Tour._demo) openSpeak(Tour._demo);
+      } catch(e) {}
+    },
     target:  null,
-    eyebrow: 'STEP 12 · SPEAK',
-    title:   'Speak anything.',
-    body:    'The Speak view is where the magic happens. Type up to 1,500 characters — a quote, a script, a message — and press Generate. Voicey sends it to one of your providers and plays back the cloned audio.',
+    eyebrow: 'STEP 11 · SPEAK',
+    title:   'Type anything. Hear it back.',
+    body:    "The Speak view is where the magic happens. Type up to 1,500 characters — a quote, a message, a script — and press Generate. Voicey routes it through one of your API providers and returns cloned audio.",
   },
   {
     view:    'view-speak',
     target:  '#speak-text',
     pad:     12,
-    eyebrow: 'STEP 13 · SCRIPT',
+    eyebrow: 'STEP 12 · SCRIPT',
     title:   'Type your script here.',
-    body:    'Paste or type anything in this box. After generating, use the playback controls to listen and download the audio as an MP3. Hit "Keep improving" to jump back to training for more samples.',
+    body:    "Paste any text. After generating, use the player to listen and save the audio as an MP3. Tap 'Keep improving' to jump back to the training view and record more prompts.",
   },
   {
     view:    'view-dashboard',
-    setup:   () => refreshDashboard(),
+    setup()  { try { refreshDashboard(); } catch(e) {} },
     target:  null,
-    eyebrow: 'ALL DONE · STEP 14',
-    title:   'You\'re ready.',
-    body:    'Add a key, create a voice, speak anything. It takes under two minutes from here. You can replay this tour any time from the Tour button in the nav bar.',
+    eyebrow: 'ALL DONE · STEP 13',
+    title:   "You're ready.",
+    body:    "The Demo Voice is in your library — record more samples to improve it, or create a real voice from scratch. Click 'Get started' to add your first free API key.",
     finish:  true,
   },
 ];
@@ -1657,10 +1651,12 @@ const Tour = {
   _ring:    null,
   _tooltip: null,
   _blocker: null,
+  _demo:    null,
 
   start() {
     Tour.end(false);
     Tour._step = 0;
+    Tour._demo = null;
     Tour._build();
     Tour._render();
   },
@@ -1686,11 +1682,11 @@ const Tour = {
     const step  = TOUR_STEPS[Tour._step];
     const total = TOUR_STEPS.length;
 
-    // Navigate to the step's view and run any setup
-    if (step.view)  show(step.view);
-    if (step.setup) step.setup();
+    // Navigate to the step's view, then run its setup
+    try { if (step.view)  show(step.view);  } catch(e) {}
+    try { if (step.setup) step.setup();     } catch(e) {}
 
-    // Skip step if target is hidden
+    // Skip step if target element is hidden / missing
     if (step.skipIfHidden && step.target) {
       const el = document.querySelector(step.target);
       if (!el || el.classList.contains('hidden') || el.style.display === 'none' || el.offsetParent === null) {
@@ -1703,26 +1699,24 @@ const Tour = {
     const isCentered = !step.target;
     const isLast     = Tour._step === total - 1 || !!step.finish;
 
-    // Position ring (defer one frame so layout settles after view switch)
+    // Defer layout reads one frame so the newly-shown view has been painted
     requestAnimationFrame(() => {
-      if (!Tour._ring) return; // tour was ended
-      if (!isCentered) {
+      if (!Tour._ring) return;
+
+      if (isCentered) {
+        Tour._ring.style.cssText = 'opacity:0;top:50%;left:50%;width:0;height:0;';
+      } else {
         const el  = document.querySelector(step.target);
         const pad = step.pad || 12;
         if (el) {
           const r = el.getBoundingClientRect();
-          Tour._ring.style.cssText = `
-            top:${r.top - pad}px; left:${r.left - pad}px;
-            width:${r.width + pad * 2}px; height:${r.height + pad * 2}px;
-            opacity:1;
-            border-radius:${getComputedStyle(el).borderRadius || '12px'};
-          `;
+          Tour._ring.style.cssText =
+            `top:${r.top - pad}px;left:${r.left - pad}px;` +
+            `width:${r.width + pad * 2}px;height:${r.height + pad * 2}px;` +
+            `opacity:1;border-radius:${getComputedStyle(el).borderRadius || '12px'};`;
         }
-      } else {
-        Tour._ring.style.cssText = 'opacity:0;top:50%;left:50%;width:0;height:0;';
       }
 
-      // Build tooltip
       const dots = TOUR_STEPS.map((_, i) =>
         `<span class="tour-dot${i === Tour._step ? ' on' : i < Tour._step ? ' done' : ''}"></span>`
       ).join('');
@@ -1737,12 +1731,12 @@ const Tour = {
         <div class="tour-tt-footer">
           <div class="tour-dots">${dots}</div>
           <div style="display:flex;gap:8px;align-items:center">
-            ${Tour._step > 0 ? `<button class="btn ghost small" id="tour-back">Back</button>` : ''}
+            ${Tour._step > 0 ? '<button class="btn ghost small" id="tour-back">Back</button>' : ''}
             <button class="btn primary small" id="tour-next">
               ${isLast ? 'Get started' : 'Next'}
               ${isLast
-                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>`
-                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`}
+                ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>'
+                : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>'}
             </button>
           </div>
         </div>
@@ -1753,9 +1747,12 @@ const Tour = {
 
       Tour._positionTooltip(step, isCentered);
 
-      document.getElementById('tour-next').addEventListener('click', () => isLast ? Tour.end(true) : Tour._advance());
-      document.getElementById('tour-back')?.addEventListener('click', () => Tour._retreat());
-      document.getElementById('tour-skip').addEventListener('click', () => Tour.end(false));
+      const nextBtn = document.getElementById('tour-next');
+      const backBtn = document.getElementById('tour-back');
+      const skipBtn = document.getElementById('tour-skip');
+      if (nextBtn) nextBtn.onclick = () => isLast ? Tour.end(true) : Tour._advance();
+      if (backBtn) backBtn.onclick = () => Tour._retreat();
+      if (skipBtn) skipBtn.onclick = () => Tour.end(false);
     });
   },
 
@@ -1813,12 +1810,10 @@ const Tour = {
   end(openKeys = false) {
     [Tour._blocker, Tour._ring, Tour._tooltip].forEach(el => el?.remove());
     Tour._blocker = Tour._ring = Tour._tooltip = null;
-    // Always land on dashboard after tour
-    show('view-dashboard');
-    refreshDashboard();
-    if (openKeys) {
-      setTimeout(() => openKeysSheet(configured().length === 0), 300);
-    }
+    Tour._demo = null;
+    try { show('view-dashboard'); } catch(e) {}
+    try { refreshDashboard(); } catch(e) {}
+    if (openKeys) setTimeout(() => { try { openKeysSheet(configured().length === 0); } catch(e) {} }, 300);
   },
 };
 
