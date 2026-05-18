@@ -749,6 +749,8 @@ function openKeysSheet(onboarding = false) {
 
   // Unhide first — nothing should be able to prevent this
   sheet.classList.remove('hidden');
+  sheet.scrollTop = 0;
+  wrap.scrollTop  = 0;
 
   // Use pinned IDs — avoids ambiguity with .eyebrow elements inside the guide
   document.getElementById('keys-sheet-eyebrow').textContent = onboarding ? 'GET STARTED' : 'SETTINGS';
