@@ -845,8 +845,10 @@ function openKeysSheet(onboarding = false) {
       inp.id = `key-input-${f.key}`;
       inp.placeholder = f.placeholder;
       inp.value = saved[f.key] || '';
-      inp.autocomplete = 'off';
+      inp.autocomplete = 'new-password';
       inp.spellcheck = false;
+      inp.readOnly = true;
+      inp.addEventListener('focus', () => { inp.readOnly = false; }, { once: true });
 
       const savedBadge = document.createElement('span');
       savedBadge.className = 'key-saved-badge hidden';
