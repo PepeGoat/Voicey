@@ -1810,6 +1810,7 @@ const Tour = {
     document.body.classList.remove('tour-active');
     [Tour._ring, Tour._tooltip].forEach(el => el?.remove());
     Tour._ring = Tour._tooltip = null;
+    if (Tour._demo) { try { removeVoice(Tour._demo.id); } catch(e) {} }
     Tour._demo = null;
     const doOpenKeys = openKeys || Tour._autoOpenKeys;
     Tour._autoOpenKeys = false;
