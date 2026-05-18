@@ -301,6 +301,65 @@ const configured = () => PROVIDERS.filter(p => p.ok());
 
 let _synthIdx = 0;
 
+/* ── Usage tracking ─────────────────────────────────────────────────────── */
+const FREE_TIERS = {
+  elevenlabs: { limit: 10000, unit: 'chars', label: 'EL', name: 'ElevenLabs' },
+  playht:     { limit: 12500, unit: 'words', label: 'PH', name: 'Play.ht'    },
+  cartesia:   { limit: 50000, unit: 'chars', label: 'CA', name: 'Cartesia'   },
+  lmnt:       { limit: 500,   unit: 'reqs',  label: 'LM', name: 'LMNT'       },
+};
+
+const Usage = {
+  get:   () => LS('usage', {}),
+  reset: () => { LS_SET('usage', {}); updateUsageWidget(); toast('Usage counters reset.'); },
+  track(providerId, text) {
+    const all = Usage.get();
+    if (!all[providerId]) all[providerId] = { chars: 0, words: 0, reqs: 0 };
+    all[providerId].chars += text.length;
+    all[providerId].words += text.trim().split(/\s+/).length;
+    all[providerId].reqs  += 1;
+    LS_SET('usage', all);
+    updateUsageWidget();
+  },
+};
+
+function updateUsageWidget() {
+  const widget = document.getElementById('usage-widget');
+  if (!widget || !S.user) return;
+  const cfg = configured();
+  if (!cfg.length) { widget.classList.add('hidden'); return; }
+  widget.classList.remove('hidden');
+
+  const usage = Usage.get();
+  const wrap  = document.getElementById('usage-bars');
+  wrap.innerHTML = '';
+
+  cfg.forEach(p => {
+    const tier = FREE_TIERS[p.id];
+    if (!tier) return;
+    const u   = usage[p.id] || { chars: 0, words: 0, reqs: 0 };
+    const val = tier.unit === 'words' ? u.words : tier.unit === 'reqs' ? u.reqs : u.chars;
+    const pct = Math.min(1, val / tier.limit);
+    const fillClass = pct >= 0.9 ? 'crit' : pct >= 0.6 ? 'warn' : '';
+    const numStr = tier.unit === 'chars'
+      ? (val >= 1000 ? `${(val / 1000).toFixed(1)}k` : `${val}`) + `/${tier.limit / 1000}k`
+      : tier.unit === 'words'
+      ? (val >= 1000 ? `${(val / 1000).toFixed(1)}k` : `${val}`) + `/${tier.limit / 1000}k`
+      : `${val}/${tier.limit}`;
+
+    const row = document.createElement('div');
+    row.className = 'usage-row';
+    row.innerHTML = `
+      <span class="usage-label">${tier.label}</span>
+      <div class="usage-bar-track"><div class="usage-bar-fill ${fillClass}" style="width:${pct * 100}%"></div></div>
+      <span class="usage-num">${numStr}</span>
+    `;
+    wrap.appendChild(row);
+  });
+
+  document.getElementById('btn-usage-reset').onclick = Usage.reset;
+}
+
 async function ensureOnProviders(voice) {
   const records = await dbGetByVoice(voice.id);
   if (!records.length) throw new Error('No audio samples found.');
@@ -352,8 +411,11 @@ async function synthesizeRotated(voice, text) {
 
   for (let i = 0; i < avail.length; i++) {
     const p = avail[(start + i) % avail.length];
-    try { return await p.synth(voice.providerMaps[p.id], text); }
-    catch (e) { errors.push(`${p.label}: ${e.message}`); }
+    try {
+      const blob = await p.synth(voice.providerMaps[p.id], text);
+      Usage.track(p.id, text);
+      return blob;
+    } catch (e) { errors.push(`${p.label}: ${e.message}`); }
   }
   throw new Error('All providers failed.\n' + errors.join('\n'));
 }
@@ -517,11 +579,12 @@ function initDashboard() {
     LS_SET('session', null); S.user = null;
     document.getElementById('app-grain').classList.remove('on');
     document.getElementById('nav-meta').innerHTML = '<span class="pill">v1.0 · BETA</span>';
+    document.getElementById('usage-widget').classList.add('hidden');
     show('view-auth');
   };
 
-  document.getElementById('btn-open-keys').onclick   = openKeysSheet;
-  document.getElementById('btn-banner-keys').onclick = openKeysSheet;
+  document.getElementById('btn-open-keys').onclick   = () => openKeysSheet(false);
+  document.getElementById('btn-banner-keys').onclick = () => openKeysSheet(false);
   document.getElementById('btn-new-voice').onclick   = openNewVoice;
 
   // Update heading
@@ -534,6 +597,12 @@ function initDashboard() {
       : `${configured().length} provider${configured().length !== 1 ? 's' : ''} configured · auto-rotated.`;
 
   refreshDashboard();
+  updateUsageWidget();
+
+  // Auto-open keys sheet on first login if no keys are configured
+  if (configured().length === 0) {
+    setTimeout(() => openKeysSheet(true), 350);
+  }
 }
 
 function refreshDashboard() {
@@ -617,10 +686,21 @@ const KEY_DEFS = [
   { id: 'lmnt',         label: 'LMNT',           sub: 'lmnt.com — 500 utterances/mo free',     fields: [{ key: 'lmnt', placeholder: 'API key…' }] },
 ];
 
-function openKeysSheet() {
+function openKeysSheet(onboarding = false) {
   const sheet = document.getElementById('keys-sheet');
   const wrap  = document.getElementById('keys-list-wrap');
   sheet.classList.remove('hidden');
+
+  // Swap header text for onboarding flow
+  const eyebrowEl = sheet.querySelector('.eyebrow');
+  const titleEl   = sheet.querySelector('.display');
+  if (onboarding) {
+    eyebrowEl.textContent = 'GET STARTED';
+    titleEl.textContent   = 'Add your first key.';
+  } else {
+    eyebrowEl.textContent = 'SETTINGS';
+    titleEl.textContent   = 'API keys';
+  }
 
   const saved = Keys.all();
   wrap.innerHTML = '';
@@ -691,6 +771,7 @@ function saveKeys() {
   toast('Keys saved.');
   closeKeysSheet();
   refreshDashboard();
+  updateUsageWidget();
 }
 
 function updateKeysCount() {
