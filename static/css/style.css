@@ -666,12 +666,9 @@ svg { display: block; }
   to   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
 }
 
-.tour-blocker {
-  position: fixed;
-  inset: 0;
-  z-index: 8997;
-  cursor: default;
-}
+/* pointer-events:none blocks clicks but NOT scroll — views remain scrollable during tour */
+body.tour-active #app-content * { pointer-events: none; }
+body.tour-active #app-nav *     { pointer-events: none; }
 .tour-ring {
   position: fixed;
   z-index: 8999;

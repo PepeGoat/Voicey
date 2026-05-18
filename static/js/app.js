@@ -608,7 +608,7 @@ function initDashboard(freshLogin = false) {
     if (!LS('tour_seen', false)) {
       // First ever login: run tour first; tour opens keys when done
       LS_SET('tour_seen', true);
-      setTimeout(() => Tour.start(), 400);
+      setTimeout(() => Tour.start(true), 400);
     } else {
       // Returning login: open keys sheet directly
       setTimeout(() => openKeysSheet(configured().length === 0), 350);
@@ -1649,25 +1649,24 @@ const TOUR_STEPS = [
 ];
 
 const Tour = {
-  _step:    0,
-  _ring:    null,
-  _tooltip: null,
-  _blocker: null,
-  _demo:    null,
+  _step:         0,
+  _ring:         null,
+  _tooltip:      null,
+  _demo:         null,
+  _autoOpenKeys: false,
 
-  start() {
+  start(autoOpenKeys = false) {
     Tour.end(false);
-    Tour._step = 0;
-    Tour._demo = null;
+    Tour._step         = 0;
+    Tour._demo         = null;
+    Tour._autoOpenKeys = autoOpenKeys;
     Tour._build();
     Tour._render();
   },
 
   _build() {
-    const blocker = document.createElement('div');
-    blocker.className = 'tour-blocker';
-    document.body.appendChild(blocker);
-    Tour._blocker = blocker;
+    // Use CSS body.tour-active to block clicks while keeping scroll working
+    document.body.classList.add('tour-active');
 
     const ring = document.createElement('div');
     ring.className = 'tour-ring';
@@ -1754,7 +1753,7 @@ const Tour = {
       const skipBtn = document.getElementById('tour-skip');
       if (nextBtn) nextBtn.onclick = () => isLast ? Tour.end(true) : Tour._advance();
       if (backBtn) backBtn.onclick = () => Tour._retreat();
-      if (skipBtn) skipBtn.onclick = () => Tour.end(false);
+      if (skipBtn) skipBtn.onclick = () => Tour.end(Tour._autoOpenKeys);
     });
   },
 
@@ -1810,12 +1809,15 @@ const Tour = {
   },
 
   end(openKeys = false) {
-    [Tour._blocker, Tour._ring, Tour._tooltip].forEach(el => el?.remove());
-    Tour._blocker = Tour._ring = Tour._tooltip = null;
+    document.body.classList.remove('tour-active');
+    [Tour._ring, Tour._tooltip].forEach(el => el?.remove());
+    Tour._ring = Tour._tooltip = null;
     Tour._demo = null;
+    const doOpenKeys = openKeys || Tour._autoOpenKeys;
+    Tour._autoOpenKeys = false;
     try { show('view-dashboard'); } catch(e) {}
     try { refreshDashboard(); } catch(e) {}
-    if (openKeys) setTimeout(() => { try { openKeysSheet(configured().length === 0); } catch(e) {} }, 300);
+    if (doOpenKeys) setTimeout(() => { try { openKeysSheet(configured().length === 0); } catch(e) {} }, 300);
   },
 };
 
