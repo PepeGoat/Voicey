@@ -572,9 +572,14 @@ function initDashboard(freshLogin = false) {
   // Update nav
   const meta = document.getElementById('nav-meta');
   meta.innerHTML = `
+    <button class="btn ghost small" id="btn-tour" title="Take the tour">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      Tour
+    </button>
     <span class="chip">${esc(S.user.username)}</span>
     <button class="btn ghost small" id="btn-logout">Sign out</button>
   `;
+  document.getElementById('btn-tour').onclick   = () => Tour.start();
   document.getElementById('btn-logout').onclick = () => {
     LS_SET('session', null); S.user = null;
     document.getElementById('app-grain').classList.remove('on');
@@ -599,9 +604,14 @@ function initDashboard(freshLogin = false) {
   refreshDashboard();
   updateUsageWidget();
 
-  // Open keys sheet on every explicit sign-in
+  // Always open keys sheet on explicit sign-in
   if (freshLogin) {
     setTimeout(() => openKeysSheet(configured().length === 0), 350);
+    // Auto-start tour on first-ever login
+    if (!LS('tour_seen', false)) {
+      LS_SET('tour_seen', true);
+      setTimeout(() => Tour.start(), 900);
+    }
   }
 }
 
@@ -736,6 +746,9 @@ function openKeysSheet(onboarding = false) {
   const saveBtn   = document.getElementById('btn-keys-save');
   const cancelBtn = document.getElementById('btn-keys-cancel');
 
+  // Unhide first — nothing should be able to prevent this
+  sheet.classList.remove('hidden');
+
   // Use pinned IDs — avoids ambiguity with .eyebrow elements inside the guide
   document.getElementById('keys-sheet-eyebrow').textContent = onboarding ? 'GET STARTED' : 'SETTINGS';
   document.getElementById('keys-sheet-title').textContent   = onboarding ? 'Add your first key.' : 'API keys';
@@ -743,8 +756,6 @@ function openKeysSheet(onboarding = false) {
     ? `Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`
     : `Done <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>`;
   cancelBtn.textContent = onboarding ? 'Skip for now' : 'Cancel';
-
-  sheet.classList.remove('hidden');
 
   const saved = Keys.all();
   wrap.innerHTML = '';
@@ -1492,6 +1503,219 @@ async function generateSpeech() {
     icon.classList.remove('hidden');
   }
 }
+
+/* ── Tour ───────────────────────────────────────────────────────────────── */
+const TOUR_STEPS = [
+  {
+    target:  null,
+    eyebrow: 'QUICK TOUR · 6 STEPS',
+    title:   'Welcome to Voicey.',
+    body:    'Clone any voice in minutes — record yourself, upload audio, or pull from YouTube. Then type anything and hear it back in that voice. Let\'s take 30 seconds to show you around.',
+  },
+  {
+    target:  '#btn-open-keys',
+    pad:     10,
+    eyebrow: 'STEP 1 · API KEYS',
+    title:   'Start with a free API key.',
+    body:    'Voicey uses ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis. All four have free tiers — no credit card required. Add as many as you like and Voicey rotates between them automatically so no single quota runs dry.',
+  },
+  {
+    target:  '#btn-new-voice',
+    pad:     10,
+    eyebrow: 'STEP 2 · CREATE',
+    title:   'Create your first voice.',
+    body:    'Click "New voice" to begin. Record 60–90 seconds on your microphone, upload an audio file, or paste a YouTube URL. Give it a name and Voicey handles the rest.',
+  },
+  {
+    target:  '#voice-grid',
+    pad:     16,
+    eyebrow: 'STEP 3 · LIBRARY',
+    title:   'Your voice library.',
+    body:    'Every cloned voice lives here as a card. Tap any card to open the speak view — type up to 1,500 characters and generate audio instantly. Hit "Keep improving" to keep training the same voice.',
+  },
+  {
+    target:  '#dash-recipe',
+    pad:     16,
+    eyebrow: 'STEP 4 · THE PROCESS',
+    title:   'Three steps. Every time.',
+    body:    'Capture clean audio. Refine by reading short prompts aloud. Speak anything. The more you refine, the more accurate the clone becomes — you control when it\'s good enough.',
+  },
+  {
+    target:  '#usage-widget',
+    pad:     10,
+    eyebrow: 'STEP 5 · USAGE',
+    title:   'Free tier tracker.',
+    body:    'This widget estimates how much of each provider\'s free quota you\'ve used. Bars turn yellow at 60% and red at 90%. Hit Reset at the start of each month to keep the counts accurate.',
+    skipIfHidden: true,
+  },
+  {
+    target:  null,
+    eyebrow: 'ALL DONE',
+    title:   'You\'re ready.',
+    body:    'Add a key, create a voice, speak anything. It takes under two minutes from here. You can re-open this tour any time from the nav.',
+    finish:  true,
+  },
+];
+
+const Tour = {
+  _step:    0,
+  _ring:    null,
+  _tooltip: null,
+  _blocker: null,
+
+  start() {
+    Tour.end();
+    Tour._step = 0;
+    Tour._build();
+    Tour._render();
+  },
+
+  _build() {
+    const blocker = document.createElement('div');
+    blocker.className = 'tour-blocker';
+    document.body.appendChild(blocker);
+    Tour._blocker = blocker;
+
+    const ring = document.createElement('div');
+    ring.className = 'tour-ring';
+    document.body.appendChild(ring);
+    Tour._ring = ring;
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tour-tooltip';
+    document.body.appendChild(tooltip);
+    Tour._tooltip = tooltip;
+  },
+
+  _render() {
+    const step  = TOUR_STEPS[Tour._step];
+    const total = TOUR_STEPS.length;
+
+    // Skip step if target is hidden
+    if (step.skipIfHidden && step.target) {
+      const el = document.querySelector(step.target);
+      if (!el || el.classList.contains('hidden') || el.style.display === 'none' || el.offsetParent === null) {
+        Tour._step++;
+        if (Tour._step < total) { Tour._render(); return; }
+        else { Tour.end(); return; }
+      }
+    }
+
+    const isCentered = !step.target;
+    const isLast     = Tour._step === total - 1 || step.finish;
+
+    // Position ring
+    if (!isCentered) {
+      const el  = document.querySelector(step.target);
+      const pad = step.pad || 12;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        Tour._ring.style.cssText = `
+          top:${r.top - pad}px; left:${r.left - pad}px;
+          width:${r.width + pad * 2}px; height:${r.height + pad * 2}px;
+          opacity:1;
+          border-radius:${getComputedStyle(el).borderRadius || '12px'};
+        `;
+      }
+    } else {
+      Tour._ring.style.cssText = 'opacity:0;top:50%;left:50%;width:0;height:0;';
+    }
+
+    // Build tooltip
+    const dots = TOUR_STEPS.map((_, i) =>
+      `<span class="tour-dot${i === Tour._step ? ' on' : i < Tour._step ? ' done' : ''}"></span>`
+    ).join('');
+
+    Tour._tooltip.innerHTML = `
+      <div class="tour-tt-header">
+        <span class="eyebrow">${step.eyebrow || `STEP ${Tour._step + 1} OF ${total}`}</span>
+        <button class="tour-skip-btn" id="tour-skip">Skip tour</button>
+      </div>
+      <div class="tour-tt-title">${step.title}</div>
+      <div class="tour-tt-body">${step.body}</div>
+      <div class="tour-tt-footer">
+        <div class="tour-dots">${dots}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${Tour._step > 0 ? `<button class="btn ghost small" id="tour-back">Back</button>` : ''}
+          <button class="btn primary small" id="tour-next">
+            ${isLast ? 'Get started' : 'Next'}
+            ${isLast
+              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>`
+              : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`}
+          </button>
+        </div>
+      </div>
+    `;
+    Tour._tooltip.classList.remove('tour-tt-anim');
+    void Tour._tooltip.offsetWidth; // reflow to restart animation
+    Tour._tooltip.classList.add('tour-tt-anim');
+
+    // Position tooltip
+    Tour._positionTooltip(step, isCentered);
+
+    document.getElementById('tour-next').addEventListener('click', () => isLast ? Tour.end() : Tour._advance());
+    document.getElementById('tour-back')?.addEventListener('click', () => Tour._retreat());
+    document.getElementById('tour-skip').addEventListener('click', () => Tour.end());
+  },
+
+  _advance() {
+    Tour._step = Math.min(Tour._step + 1, TOUR_STEPS.length - 1);
+    Tour._render();
+  },
+
+  _retreat() {
+    Tour._step = Math.max(Tour._step - 1, 0);
+    Tour._render();
+  },
+
+  _positionTooltip(step, isCentered) {
+    const TT  = Tour._tooltip;
+    const W   = 360;
+    const GAP = 22;
+    TT.style.width = `${W}px`;
+
+    if (isCentered) {
+      TT.style.top       = '50%';
+      TT.style.left      = '50%';
+      TT.style.transform = 'translate(-50%,-50%)';
+      return;
+    }
+
+    TT.style.transform = '';
+    const el  = document.querySelector(step.target);
+    if (!el) return;
+    const pad = step.pad || 12;
+    const r   = el.getBoundingClientRect();
+    const rT  = r.top  - pad;
+    const rB  = r.bottom + pad;
+    const rL  = r.left - pad;
+    const rW  = r.width + pad * 2;
+
+    // Below or above?
+    const spaceBelow = window.innerHeight - rB;
+    const spaceAbove = rT;
+    const ttH = 230;
+    let top;
+    if (spaceBelow >= ttH + GAP || spaceBelow >= spaceAbove) {
+      top = rB + GAP;
+    } else {
+      top = rT - GAP - ttH;
+    }
+    top = Math.max(12, Math.min(top, window.innerHeight - ttH - 12));
+
+    // Center over target, clamped
+    let left = rL + rW / 2 - W / 2;
+    left = Math.max(16, Math.min(left, window.innerWidth - W - 16));
+
+    TT.style.top  = `${top}px`;
+    TT.style.left = `${left}px`;
+  },
+
+  end() {
+    [Tour._blocker, Tour._ring, Tour._tooltip].forEach(el => el?.remove());
+    Tour._blocker = Tour._ring = Tour._tooltip = null;
+  },
+};
 
 /* ── Boot ───────────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
