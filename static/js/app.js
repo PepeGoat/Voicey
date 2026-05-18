@@ -605,14 +605,8 @@ function initDashboard(freshLogin = false) {
   updateUsageWidget();
 
   if (freshLogin) {
-    if (!LS('tour_seen', false)) {
-      // First ever login: run tour first; tour opens keys when done
-      LS_SET('tour_seen', true);
-      setTimeout(() => Tour.start(true), 400);
-    } else {
-      // Returning login: open keys sheet directly
-      setTimeout(() => openKeysSheet(configured().length === 0), 350);
-    }
+    LS_SET('tour_seen', true);
+    setTimeout(() => Tour.start(true), 400);
   }
 }
 
