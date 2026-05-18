@@ -728,19 +728,23 @@ function _flushKeys() {
   updateUsageWidget();
 }
 
+let _sheetBackdropHandler = null;
+
 function openKeysSheet(onboarding = false) {
   const sheet     = document.getElementById('keys-sheet');
   const wrap      = document.getElementById('keys-list-wrap');
   const saveBtn   = document.getElementById('btn-keys-save');
   const cancelBtn = document.getElementById('btn-keys-cancel');
-  sheet.classList.remove('hidden');
 
-  sheet.querySelector('.eyebrow').textContent = onboarding ? 'GET STARTED' : 'SETTINGS';
-  sheet.querySelector('.display').textContent = onboarding ? 'Add your first key.' : 'API keys';
+  // Use pinned IDs — avoids ambiguity with .eyebrow elements inside the guide
+  document.getElementById('keys-sheet-eyebrow').textContent = onboarding ? 'GET STARTED' : 'SETTINGS';
+  document.getElementById('keys-sheet-title').textContent   = onboarding ? 'Add your first key.' : 'API keys';
   saveBtn.innerHTML   = onboarding
     ? `Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`
     : `Done <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>`;
   cancelBtn.textContent = onboarding ? 'Skip for now' : 'Cancel';
+
+  sheet.classList.remove('hidden');
 
   const saved = Keys.all();
   wrap.innerHTML = '';
@@ -887,9 +891,10 @@ function openKeysSheet(onboarding = false) {
   cancelBtn.onclick = closeKeysSheet;
   saveBtn.onclick   = () => { _flushKeys(); closeKeysSheet(); refreshDashboard(); };
 
-  sheet.addEventListener('click', e => {
-    if (e.target === sheet) closeKeysSheet();
-  }, { once: true });
+  // Replace backdrop listener each time so it never accumulates
+  if (_sheetBackdropHandler) sheet.removeEventListener('click', _sheetBackdropHandler);
+  _sheetBackdropHandler = e => { if (e.target === sheet) closeKeysSheet(); };
+  sheet.addEventListener('click', _sheetBackdropHandler);
 }
 
 function closeKeysSheet() {
