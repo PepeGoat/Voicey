@@ -61,11 +61,11 @@
         <form id="form-auth" autocomplete="off" novalidate style="display:flex;flex-direction:column;gap:18px;max-width:420px">
           <div class="field">
             <label for="auth-username">Username</label>
-            <input id="auth-username" class="input" placeholder="ada_lovelace" autocomplete="username" />
+            <input id="auth-username" class="input" placeholder="ada_lovelace" autocomplete="off" spellcheck="false" />
           </div>
           <div class="field">
             <label for="auth-password">Password</label>
-            <input id="auth-password" type="password" class="input" placeholder="••••••••" autocomplete="current-password" />
+            <input id="auth-password" type="password" class="input" placeholder="••••••••" autocomplete="new-password" />
           </div>
           <div id="auth-error" class="error-msg hidden"></div>
           <button type="submit" id="auth-submit" class="btn primary" style="margin-top:8px;height:52px;justify-content:center">

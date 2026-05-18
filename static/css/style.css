@@ -557,6 +557,37 @@ svg { display: block; }
 }
 .btn-reveal:hover { color: var(--ink-mid); }
 
+/* Provider signup links */
+.key-row-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.key-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+.key-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.key-link.dim { color: var(--ink-low); }
+.key-link.dim:hover { color: var(--ink-mid); }
+
+/* Autosave badge */
+.key-saved-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 5px;
+  display: block;
+  transition: opacity 0.3s;
+}
+.key-saved-badge.hidden { display: none; }
+
 /* ── Usage widget ────────────────────────────────────────────────────────────── */
 .usage-widget {
   position: fixed;

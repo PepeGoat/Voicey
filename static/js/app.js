@@ -680,75 +680,160 @@ function buildVoiceCard(voice) {
 
 /* ── Keys sheet ─────────────────────────────────────────────────────────── */
 const KEY_DEFS = [
-  { id: 'elevenlabs',   label: 'ElevenLabs',    sub: 'elevenlabs.io — 10,000 chars/mo free',  fields: [{ key: 'elevenlabs', placeholder: 'sk-…' }] },
-  { id: 'playht',       label: 'Play.ht',        sub: 'play.ht — 12,500 words/mo free',        fields: [{ key: 'playht_secret', placeholder: 'Secret key…' }, { key: 'playht_user', placeholder: 'User ID…' }] },
-  { id: 'cartesia',     label: 'Cartesia',       sub: 'cartesia.ai — $5 free credit',          fields: [{ key: 'cartesia', placeholder: 'sk-…' }] },
-  { id: 'lmnt',         label: 'LMNT',           sub: 'lmnt.com — 500 utterances/mo free',     fields: [{ key: 'lmnt', placeholder: 'API key…' }] },
+  {
+    id: 'elevenlabs', label: 'ElevenLabs', sub: '10,000 characters / month free',
+    signupUrl: 'https://elevenlabs.io/sign-up',
+    docsUrl:   'https://elevenlabs.io/app/settings/api-keys',
+    fields: [{ key: 'elevenlabs', label: 'API Key', placeholder: 'sk-…' }],
+  },
+  {
+    id: 'playht', label: 'Play.ht', sub: '12,500 words / month free',
+    signupUrl: 'https://play.ht/sign-up/',
+    docsUrl:   'https://play.ht/app/user/settings',
+    fields: [
+      { key: 'playht_secret', label: 'Secret key', placeholder: 'ak-…' },
+      { key: 'playht_user',   label: 'User ID',    placeholder: 'user_…' },
+    ],
+  },
+  {
+    id: 'cartesia', label: 'Cartesia', sub: '$5 free credit (no card)',
+    signupUrl: 'https://play.cartesia.ai/sign-up',
+    docsUrl:   'https://play.cartesia.ai/keys',
+    fields: [{ key: 'cartesia', label: 'API Key', placeholder: 'sk-…' }],
+  },
+  {
+    id: 'lmnt', label: 'LMNT', sub: '500 utterances / month free',
+    signupUrl: 'https://app.lmnt.com/account',
+    docsUrl:   'https://app.lmnt.com/account',
+    fields: [{ key: 'lmnt', label: 'API Key', placeholder: 'API key…' }],
+  },
 ];
 
+let _keySaveTimer;
+function _flushKeys() {
+  const obj = {};
+  KEY_DEFS.forEach(def => {
+    def.fields.forEach(f => {
+      obj[f.key] = document.getElementById(`key-input-${f.key}`)?.value.trim() || '';
+    });
+  });
+  Keys.set(obj);
+  // Update live status badges
+  KEY_DEFS.forEach(def => {
+    const allSet = def.fields.every(f => !!Keys.get(f.key));
+    const el = document.getElementById(`key-status-${def.id}`);
+    if (el) { el.className = `key-row-status ${allSet ? 'set' : 'unset'}`; el.textContent = allSet ? 'Set' : 'Not set'; }
+  });
+  updateKeysCount();
+  updateUsageWidget();
+}
+
 function openKeysSheet(onboarding = false) {
-  const sheet = document.getElementById('keys-sheet');
-  const wrap  = document.getElementById('keys-list-wrap');
+  const sheet     = document.getElementById('keys-sheet');
+  const wrap      = document.getElementById('keys-list-wrap');
+  const saveBtn   = document.getElementById('btn-keys-save');
+  const cancelBtn = document.getElementById('btn-keys-cancel');
   sheet.classList.remove('hidden');
 
-  // Swap header text for onboarding flow
-  const eyebrowEl = sheet.querySelector('.eyebrow');
-  const titleEl   = sheet.querySelector('.display');
-  if (onboarding) {
-    eyebrowEl.textContent = 'GET STARTED';
-    titleEl.textContent   = 'Add your first key.';
-  } else {
-    eyebrowEl.textContent = 'SETTINGS';
-    titleEl.textContent   = 'API keys';
-  }
+  sheet.querySelector('.eyebrow').textContent = onboarding ? 'GET STARTED' : 'SETTINGS';
+  sheet.querySelector('.display').textContent = onboarding ? 'Add your first key.' : 'API keys';
+  saveBtn.innerHTML   = onboarding
+    ? `Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`
+    : `Done <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>`;
+  cancelBtn.textContent = onboarding ? 'Skip for now' : 'Cancel';
 
   const saved = Keys.all();
   wrap.innerHTML = '';
 
   KEY_DEFS.forEach(def => {
+    const allSet = def.fields.every(f => !!saved[f.key]);
     const row = document.createElement('div');
     row.className = 'key-row';
 
-    const allSet = def.fields.every(f => !!saved[f.key]);
-    row.innerHTML = `
-      <div class="key-row-header">
-        <div>
-          <div class="key-row-label">${def.label}</div>
-          <div class="key-row-sub">${def.sub}</div>
-        </div>
-        <div class="key-row-status ${allSet ? 'set' : 'unset'}">${allSet ? 'Set' : 'Not set'}</div>
+    // Header with live status badge
+    const header = document.createElement('div');
+    header.className = 'key-row-header';
+    header.innerHTML = `
+      <div>
+        <div class="key-row-label">${def.label}</div>
+        <div class="key-row-sub">${def.sub}</div>
       </div>
+      <div id="key-status-${def.id}" class="key-row-status ${allSet ? 'set' : 'unset'}">${allSet ? 'Set' : 'Not set'}</div>
     `;
+    row.appendChild(header);
 
+    // Signup / manage account links
+    const links = document.createElement('div');
+    links.className = 'key-row-links';
+    links.innerHTML = `
+      <a href="${def.signupUrl}" target="_blank" rel="noopener" class="key-link">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Create free account
+      </a>
+      <a href="${def.docsUrl}" target="_blank" rel="noopener" class="key-link dim">
+        Get API key →
+      </a>
+    `;
+    row.appendChild(links);
+
+    // Input fields with autosave
     def.fields.forEach(f => {
-      const wrap2 = document.createElement('div');
-      wrap2.className = 'key-input-wrap';
-      wrap2.style.marginTop = '10px';
+      const fieldWrap = document.createElement('div');
+      fieldWrap.style.marginTop = '10px';
+
+      const fieldLabel = document.createElement('div');
+      fieldLabel.style.cssText = 'font-size:12px;color:var(--ink-low);margin-bottom:6px;font-family:var(--mono);';
+      fieldLabel.textContent = f.label;
+      fieldWrap.appendChild(fieldLabel);
+
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'key-input-wrap';
+
       const inp = document.createElement('input');
       inp.type = 'password';
       inp.className = 'input';
       inp.id = `key-input-${f.key}`;
       inp.placeholder = f.placeholder;
       inp.value = saved[f.key] || '';
+      inp.autocomplete = 'off';
+      inp.spellcheck = false;
+
+      const savedBadge = document.createElement('span');
+      savedBadge.className = 'key-saved-badge hidden';
+      savedBadge.textContent = '✓ Saved';
+
+      inp.addEventListener('input', () => {
+        clearTimeout(_keySaveTimer);
+        _keySaveTimer = setTimeout(() => {
+          _flushKeys();
+          savedBadge.classList.remove('hidden');
+          setTimeout(() => savedBadge.classList.add('hidden'), 1500);
+        }, 500);
+      });
+
       const reveal = document.createElement('button');
       reveal.className = 'btn-reveal';
+      reveal.type = 'button';
       reveal.textContent = 'Show';
       reveal.addEventListener('click', () => {
         inp.type = inp.type === 'password' ? 'text' : 'password';
         reveal.textContent = inp.type === 'password' ? 'Show' : 'Hide';
       });
-      wrap2.appendChild(inp);
-      wrap2.appendChild(reveal);
-      row.appendChild(wrap2);
+
+      inputWrap.appendChild(inp);
+      inputWrap.appendChild(reveal);
+      fieldWrap.appendChild(inputWrap);
+      fieldWrap.appendChild(savedBadge);
+      row.appendChild(fieldWrap);
     });
 
     wrap.appendChild(row);
   });
 
   updateKeysCount();
-  document.getElementById('btn-close-keys').onclick  = closeKeysSheet;
-  document.getElementById('btn-keys-cancel').onclick = closeKeysSheet;
-  document.getElementById('btn-keys-save').onclick   = saveKeys;
+  document.getElementById('btn-close-keys').onclick = closeKeysSheet;
+  cancelBtn.onclick = closeKeysSheet;
+  saveBtn.onclick   = () => { _flushKeys(); closeKeysSheet(); refreshDashboard(); };
 
   sheet.addEventListener('click', e => {
     if (e.target === sheet) closeKeysSheet();
@@ -757,21 +842,6 @@ function openKeysSheet(onboarding = false) {
 
 function closeKeysSheet() {
   document.getElementById('keys-sheet').classList.add('hidden');
-}
-
-function saveKeys() {
-  const obj = {};
-  KEY_DEFS.forEach(def => {
-    def.fields.forEach(f => {
-      const val = document.getElementById(`key-input-${f.key}`)?.value.trim() || '';
-      obj[f.key] = val;
-    });
-  });
-  Keys.set(obj);
-  toast('Keys saved.');
-  closeKeysSheet();
-  refreshDashboard();
-  updateUsageWidget();
 }
 
 function updateKeysCount() {
