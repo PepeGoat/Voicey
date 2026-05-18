@@ -712,17 +712,6 @@ body.tour-active #app-nav *     { pointer-events: none; }
   justify-content: space-between;
   margin-bottom: 14px;
 }
-.tour-skip-btn {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-low);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  letter-spacing: 0.04em;
-}
-.tour-skip-btn:hover { color: var(--ink-mid); text-decoration: underline; }
 .tour-tt-title {
   font-family: var(--serif);
   font-size: 28px;

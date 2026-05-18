@@ -1723,13 +1723,13 @@ const Tour = {
       Tour._tooltip.innerHTML = `
         <div class="tour-tt-header">
           <span class="eyebrow">${step.eyebrow || `STEP ${Tour._step + 1} OF ${total}`}</span>
-          <button class="tour-skip-btn" id="tour-skip">Skip tutorial</button>
         </div>
         <div class="tour-tt-title">${step.title}</div>
         <div class="tour-tt-body">${step.body}</div>
         <div class="tour-tt-footer">
           <div class="tour-dots">${dots}</div>
           <div style="display:flex;gap:8px;align-items:center">
+            ${!isLast ? '<button class="btn ghost small" id="tour-skip">Skip tutorial</button>' : ''}
             ${Tour._step > 0 ? '<button class="btn ghost small" id="tour-back">Back</button>' : ''}
             <button class="btn primary small" id="tour-next">
               ${isLast ? 'Get started' : 'Next'}
