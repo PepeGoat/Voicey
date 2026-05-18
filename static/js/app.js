@@ -745,6 +745,56 @@ function openKeysSheet(onboarding = false) {
   const saved = Keys.all();
   wrap.innerHTML = '';
 
+  // ── Guide ──────────────────────────────────────────────────────────────
+  const guide = document.createElement('div');
+  guide.className = 'keys-guide';
+  guide.innerHTML = `
+    <div class="eyebrow" style="margin-bottom:14px">HOW TO ADD A KEY</div>
+    <div class="keys-guide-steps">
+      <div class="keys-guide-step">
+        <span class="keys-guide-num">1</span>
+        <span>Pick any provider below — all are <strong>completely free</strong> with no card required.</span>
+      </div>
+      <div class="keys-guide-step">
+        <span class="keys-guide-num">2</span>
+        <span>Click <strong>Create free account</strong> to open the provider's signup page in a new tab. Sign up and verify your email.</span>
+      </div>
+      <div class="keys-guide-step">
+        <span class="keys-guide-num">3</span>
+        <span>Once you're in, click <strong>Get API key</strong> — it takes you directly to the key settings page.</span>
+      </div>
+      <div class="keys-guide-step">
+        <span class="keys-guide-num">4</span>
+        <span>Create a new key, copy it, and paste it into the field below. It saves automatically as you type.</span>
+      </div>
+      <div class="keys-guide-step">
+        <span class="keys-guide-num">5</span>
+        <span>Repeat for more providers — Voicey rotates between them so your free quotas last much longer.</span>
+      </div>
+    </div>
+    <div class="keys-guide-divider"></div>
+    <div class="eyebrow" style="margin-bottom:12px">EXACTLY WHERE TO FIND EACH KEY</div>
+    <div class="keys-guide-tips">
+      <div class="keys-guide-tip">
+        <span class="keys-guide-tip-label">ElevenLabs</span>
+        <span>After signing in → click your <strong>profile icon</strong> (top-right) → <strong>API Keys</strong> → <strong>Create API Key</strong> → copy it.</span>
+      </div>
+      <div class="keys-guide-tip">
+        <span class="keys-guide-tip-label">Play.ht</span>
+        <span>After signing in → <strong>Settings</strong> → <strong>API Access</strong>. You need <em>two</em> values: the <strong>Secret Key</strong> and your <strong>User ID</strong> (shown on the same page).</span>
+      </div>
+      <div class="keys-guide-tip">
+        <span class="keys-guide-tip-label">Cartesia</span>
+        <span>After signing in → left sidebar → <strong>API Keys</strong> → <strong>New API Key</strong> → give it a name → copy the key immediately (shown only once).</span>
+      </div>
+      <div class="keys-guide-tip">
+        <span class="keys-guide-tip-label">LMNT</span>
+        <span>After signing in → <strong>Account</strong> page → scroll to the <strong>API</strong> section → click <strong>Create API Key</strong> → copy it.</span>
+      </div>
+    </div>
+  `;
+  wrap.appendChild(guide);
+
   KEY_DEFS.forEach(def => {
     const allSet = def.fields.every(f => !!saved[f.key]);
     const row = document.createElement('div');

@@ -557,6 +557,70 @@ svg { display: block; }
 }
 .btn-reveal:hover { color: var(--ink-mid); }
 
+/* Keys guide */
+.keys-guide {
+  margin-bottom: 4px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.keys-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.keys-guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  line-height: 1.55;
+}
+.keys-guide-step strong { color: var(--ink); font-weight: 600; }
+.keys-guide-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.keys-guide-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 20px 0;
+}
+.keys-guide-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.keys-guide-tip {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--ink-mid);
+  line-height: 1.5;
+}
+.keys-guide-tip strong { color: var(--ink); font-weight: 600; }
+.keys-guide-tip em { font-style: italic; color: var(--ink); }
+.keys-guide-tip-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-low);
+  min-width: 72px;
+  flex-shrink: 0;
+  padding-top: 1px;
+  letter-spacing: 0.02em;
+}
+
 /* Provider signup links */
 .key-row-links {
   display: flex;
