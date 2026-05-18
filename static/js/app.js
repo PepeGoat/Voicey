@@ -604,13 +604,14 @@ function initDashboard(freshLogin = false) {
   refreshDashboard();
   updateUsageWidget();
 
-  // Always open keys sheet on explicit sign-in
   if (freshLogin) {
-    setTimeout(() => openKeysSheet(configured().length === 0), 350);
-    // Auto-start tour on first-ever login
     if (!LS('tour_seen', false)) {
+      // First ever login: run tour first; tour opens keys when done
       LS_SET('tour_seen', true);
-      setTimeout(() => Tour.start(), 900);
+      setTimeout(() => Tour.start(), 400);
+    } else {
+      // Returning login: open keys sheet directly
+      setTimeout(() => openKeysSheet(configured().length === 0), 350);
     }
   }
 }
@@ -1505,54 +1506,148 @@ async function generateSpeech() {
 }
 
 /* ── Tour ───────────────────────────────────────────────────────────────── */
+function _tourSetupTrain() {
+  show('view-train');
+  document.getElementById('train-sentence').textContent   =
+    'The copper teapot caught the early light, casting long amber shadows across the kitchen floor.';
+  document.getElementById('train-prompt-num').textContent = 'PROMPT 01';
+  document.getElementById('train-counter').textContent    = '1 of 10 prompts';
+  document.getElementById('rec-state-label').textContent  = 'Start recording';
+  const rb = document.getElementById('btn-record');
+  if (rb) rb.classList.remove('recording');
+}
+
+function _tourSetupSpeak() {
+  show('view-speak');
+  document.getElementById('speak-voice-name').textContent    = S.user ? `${S.user.username}'s Voice` : 'My Voice';
+  document.getElementById('speak-provider-info').textContent = '10 samples · 2:34';
+  document.getElementById('speak-text').value                = '';
+  document.getElementById('char-count').textContent          = '0 / 1500';
+  document.getElementById('audio-card').classList.add('hidden');
+  document.getElementById('speak-error').classList.add('hidden');
+  document.getElementById('audio-player-wrap').classList.add('hidden');
+}
+
 const TOUR_STEPS = [
   {
+    view:    'view-dashboard',
     target:  null,
-    eyebrow: 'QUICK TOUR · 6 STEPS',
+    eyebrow: 'QUICK TOUR · 15 STEPS',
     title:   'Welcome to Voicey.',
-    body:    'Clone any voice in minutes — record yourself, upload audio, or pull from YouTube. Then type anything and hear it back in that voice. Let\'s take 30 seconds to show you around.',
+    body:    'Clone any voice in minutes — record yourself, upload audio, or paste a YouTube link. Then type anything and hear it back in that voice. Let\'s walk through every part of the app.',
   },
   {
+    view:    'view-dashboard',
     target:  '#btn-open-keys',
     pad:     10,
     eyebrow: 'STEP 1 · API KEYS',
     title:   'Start with a free API key.',
-    body:    'Voicey uses ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis. All four have free tiers — no credit card required. Add as many as you like and Voicey rotates between them automatically so no single quota runs dry.',
+    body:    'Voicey runs entirely in your browser and uses ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis — all have generous free tiers, no credit card required. Add as many as you like and Voicey rotates between them automatically.',
   },
   {
+    view:    'view-dashboard',
     target:  '#btn-new-voice',
     pad:     10,
     eyebrow: 'STEP 2 · CREATE',
     title:   'Create your first voice.',
-    body:    'Click "New voice" to begin. Record 60–90 seconds on your microphone, upload an audio file, or paste a YouTube URL. Give it a name and Voicey handles the rest.',
+    body:    'Click "New voice" to begin cloning. You can record on your microphone, upload an audio file, or paste a YouTube URL. Give the voice a name and Voicey handles the rest.',
   },
   {
+    view:    'view-dashboard',
     target:  '#voice-grid',
     pad:     16,
     eyebrow: 'STEP 3 · LIBRARY',
     title:   'Your voice library.',
-    body:    'Every cloned voice lives here as a card. Tap any card to open the speak view — type up to 1,500 characters and generate audio instantly. Hit "Keep improving" to keep training the same voice.',
+    body:    'Every cloned voice lives here as a card. Tap any card to open the speak view. Hit "Keep improving" on a voice to add more training samples and increase accuracy over time.',
   },
   {
+    view:    'view-dashboard',
     target:  '#dash-recipe',
     pad:     16,
     eyebrow: 'STEP 4 · THE PROCESS',
     title:   'Three steps. Every time.',
-    body:    'Capture clean audio. Refine by reading short prompts aloud. Speak anything. The more you refine, the more accurate the clone becomes — you control when it\'s good enough.',
+    body:    'Capture clean audio. Refine by reading short prompts aloud. Speak anything. The more samples you record in training, the more accurate the clone becomes — you control when it\'s good enough.',
   },
   {
-    target:  '#usage-widget',
-    pad:     10,
-    eyebrow: 'STEP 5 · USAGE',
-    title:   'Free tier tracker.',
-    body:    'This widget estimates how much of each provider\'s free quota you\'ve used. Bars turn yellow at 60% and red at 90%. Hit Reset at the start of each month to keep the counts accurate.',
+    view:         'view-dashboard',
+    target:       '#usage-widget',
+    pad:          10,
+    eyebrow:      'STEP 5 · USAGE',
+    title:        'Free tier tracker.',
+    body:         'This widget estimates how much of each provider\'s free quota you\'ve used. Bars turn yellow at 60 % and red at 90 %. Hit Reset at the start of each month to keep the counts accurate.',
     skipIfHidden: true,
   },
   {
+    view:    'view-new',
+    setup:   () => openNewVoice(),
     target:  null,
-    eyebrow: 'ALL DONE',
+    eyebrow: 'STEP 6 · NEW VOICE',
+    title:   'Creating a new voice.',
+    body:    'This is the New Voice screen. Give your voice a memorable name, then pick how to capture audio: record directly with your mic, upload a file, or pull audio from a YouTube video.',
+  },
+  {
+    view:    'view-new',
+    target:  '#new-voice-name',
+    pad:     10,
+    eyebrow: 'STEP 7 · NAME',
+    title:   'Name your voice.',
+    body:    'Type a descriptive name here — "My Voice", "Interview Mic", or whoever you\'re cloning. It appears on the library card. Choose carefully; you can\'t rename it later.',
+  },
+  {
+    view:    'view-new',
+    target:  '#new-source-tabs',
+    pad:     8,
+    eyebrow: 'STEP 8 · SOURCE',
+    title:   'Three ways to capture audio.',
+    body:    '<b>Mic</b> — record live in the browser. Best for cloning your own voice. <b>Upload</b> — drag or pick an MP3 or WAV up to 50 MB. <b>YouTube</b> — paste any public video URL; Voicey extracts the audio automatically.',
+  },
+  {
+    view:    'view-new',
+    target:  '#new-rec-btn',
+    pad:     14,
+    eyebrow: 'STEP 9 · RECORD',
+    title:   'Tap to start recording.',
+    body:    'Press this button to capture audio from your microphone. A waveform appears as you speak. Aim for 60–90 seconds of natural speech. Press again to stop, or hit Redo to start over.',
+  },
+  {
+    view:    'view-train',
+    setup:   () => _tourSetupTrain(),
+    target:  null,
+    eyebrow: 'STEP 10 · TRAINING',
+    title:   'Refine with prompts.',
+    body:    'The Training view presents short sentences to read aloud. Each recording is saved as a training sample. The more prompts you record, the more naturally the AI reproduces your voice\'s nuances.',
+  },
+  {
+    view:    'view-train',
+    target:  '#btn-record',
+    pad:     14,
+    eyebrow: 'STEP 11 · RECORD PROMPT',
+    title:   'Read the prompt. Press record.',
+    body:    'Read the sentence shown above out loud, then press this button to capture it. After recording, press "Next prompt" to continue. Press "Done for now" at any time to return to your library.',
+  },
+  {
+    view:    'view-speak',
+    setup:   () => _tourSetupSpeak(),
+    target:  null,
+    eyebrow: 'STEP 12 · SPEAK',
+    title:   'Speak anything.',
+    body:    'The Speak view is where the magic happens. Type up to 1,500 characters — a quote, a script, a message — and press Generate. Voicey sends it to one of your providers and plays back the cloned audio.',
+  },
+  {
+    view:    'view-speak',
+    target:  '#speak-text',
+    pad:     12,
+    eyebrow: 'STEP 13 · SCRIPT',
+    title:   'Type your script here.',
+    body:    'Paste or type anything in this box. After generating, use the playback controls to listen and download the audio as an MP3. Hit "Keep improving" to jump back to training for more samples.',
+  },
+  {
+    view:    'view-dashboard',
+    setup:   () => refreshDashboard(),
+    target:  null,
+    eyebrow: 'ALL DONE · STEP 14',
     title:   'You\'re ready.',
-    body:    'Add a key, create a voice, speak anything. It takes under two minutes from here. You can re-open this tour any time from the nav.',
+    body:    'Add a key, create a voice, speak anything. It takes under two minutes from here. You can replay this tour any time from the Tour button in the nav bar.',
     finish:  true,
   },
 ];
@@ -1564,7 +1659,7 @@ const Tour = {
   _blocker: null,
 
   start() {
-    Tour.end();
+    Tour.end(false);
     Tour._step = 0;
     Tour._build();
     Tour._render();
@@ -1591,71 +1686,77 @@ const Tour = {
     const step  = TOUR_STEPS[Tour._step];
     const total = TOUR_STEPS.length;
 
+    // Navigate to the step's view and run any setup
+    if (step.view)  show(step.view);
+    if (step.setup) step.setup();
+
     // Skip step if target is hidden
     if (step.skipIfHidden && step.target) {
       const el = document.querySelector(step.target);
       if (!el || el.classList.contains('hidden') || el.style.display === 'none' || el.offsetParent === null) {
         Tour._step++;
         if (Tour._step < total) { Tour._render(); return; }
-        else { Tour.end(); return; }
+        else { Tour.end(false); return; }
       }
     }
 
     const isCentered = !step.target;
-    const isLast     = Tour._step === total - 1 || step.finish;
+    const isLast     = Tour._step === total - 1 || !!step.finish;
 
-    // Position ring
-    if (!isCentered) {
-      const el  = document.querySelector(step.target);
-      const pad = step.pad || 12;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        Tour._ring.style.cssText = `
-          top:${r.top - pad}px; left:${r.left - pad}px;
-          width:${r.width + pad * 2}px; height:${r.height + pad * 2}px;
-          opacity:1;
-          border-radius:${getComputedStyle(el).borderRadius || '12px'};
-        `;
+    // Position ring (defer one frame so layout settles after view switch)
+    requestAnimationFrame(() => {
+      if (!Tour._ring) return; // tour was ended
+      if (!isCentered) {
+        const el  = document.querySelector(step.target);
+        const pad = step.pad || 12;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          Tour._ring.style.cssText = `
+            top:${r.top - pad}px; left:${r.left - pad}px;
+            width:${r.width + pad * 2}px; height:${r.height + pad * 2}px;
+            opacity:1;
+            border-radius:${getComputedStyle(el).borderRadius || '12px'};
+          `;
+        }
+      } else {
+        Tour._ring.style.cssText = 'opacity:0;top:50%;left:50%;width:0;height:0;';
       }
-    } else {
-      Tour._ring.style.cssText = 'opacity:0;top:50%;left:50%;width:0;height:0;';
-    }
 
-    // Build tooltip
-    const dots = TOUR_STEPS.map((_, i) =>
-      `<span class="tour-dot${i === Tour._step ? ' on' : i < Tour._step ? ' done' : ''}"></span>`
-    ).join('');
+      // Build tooltip
+      const dots = TOUR_STEPS.map((_, i) =>
+        `<span class="tour-dot${i === Tour._step ? ' on' : i < Tour._step ? ' done' : ''}"></span>`
+      ).join('');
 
-    Tour._tooltip.innerHTML = `
-      <div class="tour-tt-header">
-        <span class="eyebrow">${step.eyebrow || `STEP ${Tour._step + 1} OF ${total}`}</span>
-        <button class="tour-skip-btn" id="tour-skip">Skip tour</button>
-      </div>
-      <div class="tour-tt-title">${step.title}</div>
-      <div class="tour-tt-body">${step.body}</div>
-      <div class="tour-tt-footer">
-        <div class="tour-dots">${dots}</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          ${Tour._step > 0 ? `<button class="btn ghost small" id="tour-back">Back</button>` : ''}
-          <button class="btn primary small" id="tour-next">
-            ${isLast ? 'Get started' : 'Next'}
-            ${isLast
-              ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>`
-              : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`}
-          </button>
+      Tour._tooltip.innerHTML = `
+        <div class="tour-tt-header">
+          <span class="eyebrow">${step.eyebrow || `STEP ${Tour._step + 1} OF ${total}`}</span>
+          <button class="tour-skip-btn" id="tour-skip">Skip tour</button>
         </div>
-      </div>
-    `;
-    Tour._tooltip.classList.remove('tour-tt-anim');
-    void Tour._tooltip.offsetWidth; // reflow to restart animation
-    Tour._tooltip.classList.add('tour-tt-anim');
+        <div class="tour-tt-title">${step.title}</div>
+        <div class="tour-tt-body">${step.body}</div>
+        <div class="tour-tt-footer">
+          <div class="tour-dots">${dots}</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            ${Tour._step > 0 ? `<button class="btn ghost small" id="tour-back">Back</button>` : ''}
+            <button class="btn primary small" id="tour-next">
+              ${isLast ? 'Get started' : 'Next'}
+              ${isLast
+                ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>`
+                : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>`}
+            </button>
+          </div>
+        </div>
+      `;
+      Tour._tooltip.classList.remove('tour-tt-anim');
+      void Tour._tooltip.offsetWidth;
+      Tour._tooltip.classList.add('tour-tt-anim');
 
-    // Position tooltip
-    Tour._positionTooltip(step, isCentered);
+      Tour._positionTooltip(step, isCentered);
 
-    document.getElementById('tour-next').addEventListener('click', () => isLast ? Tour.end() : Tour._advance());
-    document.getElementById('tour-back')?.addEventListener('click', () => Tour._retreat());
-    document.getElementById('tour-skip').addEventListener('click', () => Tour.end());
+      document.getElementById('tour-next').addEventListener('click', () => isLast ? Tour.end(true) : Tour._advance());
+      document.getElementById('tour-back')?.addEventListener('click', () => Tour._retreat());
+      document.getElementById('tour-skip').addEventListener('click', () => Tour.end(false));
+    });
   },
 
   _advance() {
@@ -1691,7 +1792,6 @@ const Tour = {
     const rL  = r.left - pad;
     const rW  = r.width + pad * 2;
 
-    // Below or above?
     const spaceBelow = window.innerHeight - rB;
     const spaceAbove = rT;
     const ttH = 230;
@@ -1703,7 +1803,6 @@ const Tour = {
     }
     top = Math.max(12, Math.min(top, window.innerHeight - ttH - 12));
 
-    // Center over target, clamped
     let left = rL + rW / 2 - W / 2;
     left = Math.max(16, Math.min(left, window.innerWidth - W - 16));
 
@@ -1711,9 +1810,15 @@ const Tour = {
     TT.style.left = `${left}px`;
   },
 
-  end() {
+  end(openKeys = false) {
     [Tour._blocker, Tour._ring, Tour._tooltip].forEach(el => el?.remove());
     Tour._blocker = Tour._ring = Tour._tooltip = null;
+    // Always land on dashboard after tour
+    show('view-dashboard');
+    refreshDashboard();
+    if (openKeys) {
+      setTimeout(() => openKeysSheet(configured().length === 0), 300);
+    }
   },
 };
 
