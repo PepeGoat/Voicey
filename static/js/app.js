@@ -554,7 +554,7 @@ function initAuth() {
         ? await loginUser(username, password)
         : await registerUser(username, password);
       LS_SET('session', S.user.id);
-      initDashboard();
+      initDashboard(true);
     } catch (e) {
       err.textContent = e.message;
       err.classList.remove('hidden');
@@ -565,7 +565,7 @@ function initAuth() {
 }
 
 /* ── Dashboard ──────────────────────────────────────────────────────────── */
-function initDashboard() {
+function initDashboard(freshLogin = false) {
   document.getElementById('app-grain').classList.add('on');
   show('view-dashboard');
 
@@ -599,9 +599,9 @@ function initDashboard() {
   refreshDashboard();
   updateUsageWidget();
 
-  // Auto-open keys sheet on first login if no keys are configured
-  if (configured().length === 0) {
-    setTimeout(() => openKeysSheet(true), 350);
+  // Open keys sheet on every explicit sign-in
+  if (freshLogin) {
+    setTimeout(() => openKeysSheet(configured().length === 0), 350);
   }
 }
 
