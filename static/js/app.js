@@ -570,19 +570,23 @@ function initDashboard(freshLogin = false) {
   show('view-dashboard');
 
   // Update nav
+  const center = document.getElementById('nav-center');
+  center.innerHTML = `
+    <button class="btn primary tutorial" id="btn-tutorial">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Start Tutorial
+    </button>
+  `;
   const meta = document.getElementById('nav-meta');
   meta.innerHTML = `
-    <button class="btn ghost small" id="btn-tour" title="Take the tour">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-      Tour
-    </button>
     <span class="chip">${esc(S.user.username)}</span>
     <button class="btn ghost small" id="btn-logout">Sign out</button>
   `;
-  document.getElementById('btn-tour').onclick   = () => Tour.start();
+  document.getElementById('btn-tutorial').onclick = () => Tour.start();
   document.getElementById('btn-logout').onclick = () => {
     LS_SET('session', null); S.user = null;
     document.getElementById('app-grain').classList.remove('on');
+    document.getElementById('nav-center').innerHTML = '';
     document.getElementById('nav-meta').innerHTML = '<span class="pill">v1.0 · BETA</span>';
     document.getElementById('usage-widget').classList.add('hidden');
     show('view-auth');
@@ -1506,7 +1510,7 @@ const TOUR_STEPS = [
   {
     view:    'view-dashboard',
     target:  null,
-    eyebrow: 'QUICK TOUR · 14 STEPS',
+    eyebrow: 'QUICK TUTORIAL · 14 STEPS',
     title:   'Welcome to Voicey.',
     body:    "Clone any voice and generate speech from text — entirely in your browser. Let's walk through every screen and create a demo voice along the way.",
   },
@@ -1516,7 +1520,7 @@ const TOUR_STEPS = [
     pad:     10,
     eyebrow: 'STEP 1 · API KEYS',
     title:   'You need one free API key.',
-    body:    "Voicey calls ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis. All four are completely free to start — no credit card. We'll open the key setup when this tour ends.",
+    body:    "Voicey calls ElevenLabs, Play.ht, Cartesia, and LMNT for synthesis. All four are completely free to start — no credit card. We'll open the key setup when this tutorial ends.",
   },
   {
     view:    'view-dashboard',
@@ -1637,7 +1641,7 @@ const TOUR_STEPS = [
     target:  null,
     eyebrow: 'ALL DONE · STEP 13',
     title:   "You're ready.",
-    body:    "The Demo Voice is in your library — record more samples to improve it, or create a real voice from scratch. Click 'Get started' to add your first free API key.",
+    body:    "The Demo Voice is in your library — record more samples to improve it, or create a real voice from scratch. Click 'Get started' to add your first free API key. You can relaunch this tutorial any time from the nav.",
     finish:  true,
   },
 ];
@@ -1719,7 +1723,7 @@ const Tour = {
       Tour._tooltip.innerHTML = `
         <div class="tour-tt-header">
           <span class="eyebrow">${step.eyebrow || `STEP ${Tour._step + 1} OF ${total}`}</span>
-          <button class="tour-skip-btn" id="tour-skip">Skip tour</button>
+          <button class="tour-skip-btn" id="tour-skip">Skip tutorial</button>
         </div>
         <div class="tour-tt-title">${step.title}</div>
         <div class="tour-tt-body">${step.body}</div>
